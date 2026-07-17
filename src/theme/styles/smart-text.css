@@ -53,3 +53,50 @@
 
 /* drawio inline SVGs. */
 .vp-doc img.drawio { max-width: 100%; }
+
+/* GitBook card grids (<table data-view="cards"> -> .mdbook-cards). */
+.vp-doc .mdbook-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.vp-doc .mdbook-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--vp-c-bg-soft);
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+}
+.vp-doc .mdbook-card:hover {
+  border-color: var(--vp-c-brand-1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+.vp-doc .mdbook-card-cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  margin: 0;
+  border-radius: 0;
+}
+.vp-doc .mdbook-card-body {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vp-doc .mdbook-card-title {
+  font-weight: 700;
+  line-height: 1.3;
+}
+.vp-doc .mdbook-card-title a { font-weight: 700; }
+.vp-doc .mdbook-card-field {
+  font-size: 0.9em;
+  color: var(--vp-c-text-2);
+}
+/* First field after the title reads as an italic subtitle (role/subtitle). */
+.vp-doc .mdbook-card-field:first-of-type em { font-style: italic; }

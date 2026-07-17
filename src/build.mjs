@@ -10,6 +10,7 @@ import { ingestTermx } from './ingest/termx.mjs'
 import { copyDir } from './ingest/util.mjs'
 import { sanitizeTermxMarkdown } from './ingest/sanitize.mjs'
 import { fixStagedImages } from './ingest/images.mjs'
+import { transformGitbookCards } from './ingest/cards.mjs'
 
 const MDBOOK_SRC = path.dirname(fileURLToPath(import.meta.url)) // .../mdbook/src
 
@@ -63,13 +64,16 @@ function stageContent(cfg, model) {
     if (e.code !== 'EEXIST') throw e
   }
 
-  // Copy content files (sanitizing TermX markdown for the Vue compiler).
-  const sanitize = cfg.source.format === 'termx'
+  // Copy content files, running markdown through the transform pipeline.
+  const isTermx = cfg.source.format === 'termx'
   for (const f of model.contentFiles) {
     const dest = path.join(staging, f.dest)
     fs.mkdirSync(path.dirname(dest), { recursive: true })
-    if (sanitize && f.src.endsWith('.md')) {
-      fs.writeFileSync(dest, sanitizeTermxMarkdown(fs.readFileSync(f.src, 'utf8')))
+    if (f.src.endsWith('.md')) {
+      let text = fs.readFileSync(f.src, 'utf8')
+      if (isTermx) text = sanitizeTermxMarkdown(text)
+      text = transformGitbookCards(text) // GitBook card tables -> card grid
+      fs.writeFileSync(dest, text)
     } else {
       fs.copyFileSync(f.src, dest)
     }
