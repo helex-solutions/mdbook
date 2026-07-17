@@ -1,0 +1,55 @@
+/* Styling for TermX / Wiki.js "smart text" produced by the markdown plugins. */
+
+/* Callout blockquotes: `> text {.is-info}` (also .is-warning/.is-success/.is-error). */
+.vp-doc blockquote.is-info,
+.vp-doc blockquote.is-warning,
+.vp-doc blockquote.is-success,
+.vp-doc blockquote.is-error {
+  border-radius: 8px;
+  border-left-width: 4px;
+  padding: 0.6rem 1rem;
+  margin: 1rem 0;
+}
+.vp-doc blockquote.is-info { border-left-color: var(--vp-c-brand-1); background: var(--vp-c-brand-soft); }
+.vp-doc blockquote.is-warning { border-left-color: var(--vp-c-warning-1); background: var(--vp-c-warning-soft); }
+.vp-doc blockquote.is-success { border-left-color: var(--vp-c-tip-1, #10b981); background: var(--vp-c-tip-soft, rgba(16,185,129,.14)); }
+.vp-doc blockquote.is-error { border-left-color: var(--vp-c-danger-1); background: var(--vp-c-danger-soft); }
+
+/* Link lists: `- [..](..)` list tagged {.links-list}. */
+.vp-doc ul.links-list {
+  list-style: none;
+  padding-left: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.vp-doc ul.links-list > li {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 0.55rem 0.8rem;
+  transition: border-color 0.2s;
+}
+.vp-doc ul.links-list > li:hover { border-color: var(--vp-c-brand-1); }
+
+/* Grid lists: {.grid-list}. */
+.vp-doc ul.grid-list {
+  list-style: none;
+  padding-left: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.6rem;
+}
+
+/* Collapsible +++ blocks. */
+.vp-doc details.mdbook-collapsible {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 0.4rem 0.9rem;
+  margin: 1rem 0;
+}
+.vp-doc details.mdbook-collapsible > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* drawio inline SVGs. */
+.vp-doc img.drawio { max-width: 100%; }

@@ -1,0 +1,9 @@
+/* Skin: paper — warm, serif, book-like. Good for tutorials and long reads. */
+:root {
+  --vp-c-brand-1: #9a5b2c;
+  --vp-c-brand-2: #b06f3c;
+  --vp-c-brand-3: #c5854f;
+  --vp-c-brand-soft: rgba(154, 91, 44, 0.14);
+  --vp-font-family-base: Georgia, Cambria, 'Times New Roman', serif;
+  --mdbook-content-max: 52rem;
+}

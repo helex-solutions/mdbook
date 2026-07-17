@@ -1,0 +1,49 @@
+name: mdbook
+description: Build a searchable, themeable, multilingual site from Markdown + metadata (TermX Wiki / GitBook) using mdbook.
+branding:
+  icon: book-open
+  color: green
+
+inputs:
+  project:
+    description: Project root containing the .mdbook/ config folder.
+    required: false
+    default: '.'
+  output:
+    description: Output directory for the built site (default <project>/.mdbook/dist).
+    required: false
+    default: ''
+  node-version:
+    description: Node.js version to build with.
+    required: false
+    default: '20'
+
+outputs:
+  site:
+    description: Path to the built static site.
+    value: ${{ steps.build.outputs.site }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install mdbook
+      shell: bash
+      run: |
+        npm --prefix "${{ github.action_path }}" ci --omit=dev \
+          || npm --prefix "${{ github.action_path }}" install --omit=dev
+
+    - name: Build site
+      id: build
+      shell: bash
+      run: |
+        OUT_ARG=""
+        if [ -n "${{ inputs.output }}" ]; then OUT_ARG="--out ${{ inputs.output }}"; fi
+        node "${{ github.action_path }}/bin/mdbook.mjs" build --project "${{ inputs.project }}" $OUT_ARG
+        SITE="${{ inputs.output }}"
+        if [ -z "$SITE" ]; then SITE="${{ inputs.project }}/.mdbook/dist"; fi
+        echo "site=$SITE" >> "$GITHUB_OUTPUT"
