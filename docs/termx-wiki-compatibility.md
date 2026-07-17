@@ -78,8 +78,10 @@ tx-server: https://your-termx-host/api/fhir   # FHIR API base (…/fhir)
 ```
 
 - `{{csc:}}` / `{{vsc:}}` are expanded to tables at build time from this server.
-- `cs:` / `vs:` / `concept:` links resolve to the TermX web UI (`space.json.web`) when
-  available, otherwise to FHIR resource URLs on `tx-server`.
+- `cs:` / `vs:` / `concept:` links resolve to the TermX web UI. The base is chosen in
+  order: an explicit `site.web`, else the **tx-server's own web origin** (its URL with
+  `/api/fhir` or `/fhir` stripped — so links follow the configured server), else the
+  space's `web`. Set `site.web` to point links somewhere other than `tx-server`.
 
 ## To reach full parity later
 

@@ -28,8 +28,16 @@ function ingest(cfg) {
   return adapter(cfg)
 }
 
+// The TermX web UI origin, derived from the FHIR server (…/api/fhir or …/fhir).
+function webFromTxServer(txServer) {
+  return txServer ? txServer.replace(/\/(api\/)?fhir\/?$/i, '') : null
+}
+
 // Build the JSON bundle handed to createMdbookConfig at VitePress config time.
 function makeBundle(cfg, model) {
+  // cs:/vs:/concept: link base — explicit site.web wins, else the tx-server's
+  // own web UI (so links follow the configured server), else the space's web.
+  const web = cfg.site.web || webFromTxServer(cfg.txServer) || model.web || null
   return {
     title: cfg.site.title || model.title,
     description: cfg.site.description,
@@ -43,7 +51,7 @@ function makeBundle(cfg, model) {
     userSidebar: cfg.sidebar,
     userSidebarExtra: cfg.sidebarExtra,
     search: cfg.search,
-    web: model.web || null,
+    web,
     txServer: cfg.txServer,
     logo: cfg.site.logo,
     outDir: cfg.build.out,
