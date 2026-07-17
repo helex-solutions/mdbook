@@ -5,53 +5,86 @@ It turns **TermX Wiki** exports and **GitBook** repositories into a fast, search
 themeable, multilingual website — and ships as a **GitHub Action**.
 
 Built on [VitePress](https://vitepress.dev) (which uses `markdown-it`), so the TermX
-Wiki "smart text" plugins run natively.
+Wiki "smart text" runs natively.
 
 ## Features
 
 - 🔎 **Search** — built-in local full-text search (no external service)
-- 🎨 **Skins** — swappable themes (`default`, `ocean`, `paper`, plus brand skins `helex` and `taltech`) via CSS-variable palettes
-- 🧭 **Custom menu** — nav & sidebar auto-generated from your content, extendable/overridable in config
-- 🖼️ **Assets** — GitBook `.gitbook/assets` and TermX `files/<id>/…` attachments handled automatically
-- 🌍 **Multilingual** — first-class locales, driven by the `lang` on TermX page contents
-- 🧩 **Plugins** — the `markdown-it` plugin chain, including TermX links (`page:` `cs:` `vs:` `concept:`), `files/` images, `+++` collapsibles, `{.is-info}` callouts
+- 🎨 **Skins** — swappable themes (`default`, `ocean`, `paper`, plus brand skins `helex`, `taltech`)
+- 🧭 **Menu** — nav & sidebar auto-generated from your content; extendable or overridable in config
+- 🌍 **Multilingual** — first-class locales (default language at `/`, others under `/<lang>/`)
+- 🧩 **TermX smart-text** — callouts, tabsets, links-list/grid-list, `+++` collapsibles, `page:`/`cs:`/`vs:`/`concept:` links, `files/` images, page icons, GitBook card tables
+- 📊 **Diagrams** — drawio, Mermaid, PlantUML
+- 🔗 **Terminology** — `{{def:}}` StructureDefinition viewer, and `{{csc:}}`/`{{vsc:}}` concept tables fetched from a FHIR server at build time
 
-## Source formats
+See [`docs/termx-wiki-compatibility.md`](docs/termx-wiki-compatibility.md) for the full
+TermX Wiki → mdbook feature matrix.
 
-| Format | Detected by | Layout |
-|---|---|---|
-| `gitbook` | `SUMMARY.md` | `README.md` (home) + `SUMMARY.md` (nav) + `.gitbook/assets` |
-| `termx` | `__source/pages.json` or `input/pages.json` | `space.json` + `pages.json` + `input/*.md` (or `input/pagecontent/*.md`) |
+## Quick start — a new project
 
-Format is auto-detected but can be set explicitly in `.mdbook/config.yml`.
+1. **Add a `.mdbook/` config folder** to your content repo:
 
-## Usage
+   ```yaml
+   # .mdbook/config.yml
+   site:
+     title: My Docs
+     lang: en
+   source:
+     format: gitbook          # gitbook | termx  (auto-detected if omitted)
+   theme:
+     skin: default            # default | ocean | paper | helex | taltech
+   search: true
+   ```
 
-### As a GitHub Action
+   Also add `.mdbook/.gitignore` with `.cache/` and `dist/`.
 
-Add a `.mdbook/` config folder to your project (see below), then a workflow:
+2. **Add a deploy workflow** `.github/workflows/mdbook.yml`:
 
-```yaml
-- uses: igorboss/mdbook@main
-  id: mdbook
-  with:
-    project: .            # folder containing .mdbook/
-- uses: actions/upload-pages-artifact@v3
-  with:
-    path: ${{ steps.mdbook.outputs.site }}
-```
+   ```yaml
+   name: Publish site
+   on:
+     push: { branches: [main] }
+     workflow_dispatch:
+   permissions: { contents: read, pages: write, id-token: write }
+   concurrency: { group: pages, cancel-in-progress: true }
+   jobs:
+     build:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v4
+         - id: mdbook
+           uses: igorboss/mdbook@main
+           with: { project: . }
+         - uses: actions/configure-pages@v5
+         - uses: actions/upload-pages-artifact@v3
+           with: { path: ${{ steps.mdbook.outputs.site }} }
+     deploy:
+       needs: build
+       runs-on: ubuntu-latest
+       environment: { name: github-pages, url: ${{ steps.deployment.outputs.page_url }} }
+       steps:
+         - id: deployment
+           uses: actions/deploy-pages@v4
+   ```
 
-A complete build-and-deploy-to-Pages workflow is in
-`.github/workflows/mdbook.yml` of each migrated project.
+3. **Enable GitHub Pages** → repo *Settings → Pages → Source: GitHub Actions*.
+   (Pages on a **private** repo needs a paid plan; public repos work on the free plan.)
 
-### Locally
+4. **Push to `main`.** The workflow builds and publishes to `https://<owner>.github.io/<repo>/`.
+
+> For a project served under `/<repo>/` (not a custom domain), set `site.base: /<repo>/`
+> in the config so asset URLs resolve.
+
+## Local preview
 
 ```bash
 npx github:igorboss/mdbook build --project .   # build to .mdbook/dist
 npx github:igorboss/mdbook dev   --project .   # live-reload dev server
 ```
 
-## Configuration — `.mdbook/config.yml`
+(`npx` clones the public repo and runs it; no npm publish needed. Requires Node ≥ 20.)
+
+## Configuration reference — `.mdbook/config.yml`
 
 ```yaml
 site:
@@ -59,19 +92,21 @@ site:
   description: One-line summary
   lang: en                     # default locale
   base: /                      # set to /repo/ for GitHub project pages
-  logo: /logo.svg
+  logo: /.gitbook/assets/logo.png
+  web: https://example.org     # optional: base for cs:/vs:/page: web links
 
 source:
   format: gitbook              # gitbook | termx  (auto-detected if omitted)
-  # gitbook: root, summary, home, assets
-  # termx:   meta, pages, assets
 
 theme:
   skin: default                # default | ocean | paper | helex | taltech
 
 search: true
 
-# Menu: added on top of the auto-generated nav/sidebar.
+# TermX terminology (optional) — FHIR server for {{csc:}}/{{vsc:}} and cs:/vs: links.
+tx-server: https://your-termx-host/api/fhir
+
+# Menu — added on top of the auto-generated nav/sidebar.
 nav:
   - text: Home page
     link: https://example.org
@@ -85,22 +120,26 @@ build:
   out: .mdbook/dist
 ```
 
+### Source formats
+
+| Format | Detected by | Layout |
+|---|---|---|
+| `gitbook` | `SUMMARY.md` | `README.md` (home) + `SUMMARY.md` (nav) + `.gitbook/assets` |
+| `termx` | `__source/pages.json` or `input/pages.json` | `space.json` + `pages.json` + `input/*.md` (or `input/pagecontent/*.md`) |
+
 ## How it works
 
 1. **Ingest** — a format adapter reads your content into a unified model
    (title, languages, per-locale sidebars, content files, assets).
 2. **Stage** — content is copied into a scratch VitePress project under `.mdbook/.cache/`,
-   with a generated `.vitepress/config.mjs` (from the model) and a theme entry that
-   imports the selected skin.
+   with a generated `.vitepress/config.mjs` and a theme entry for the selected skin;
+   TermX smart-text is transformed/expanded here.
 3. **Build** — VitePress renders the static site to `.mdbook/dist`.
 
-## Roadmap
+## Live examples
 
-- [x] GitBook ingestion + Pages deploy (portfolio)
-- [ ] TermX multilingual ingestion (tutorial, ccm-specs)
-- [ ] Build-time expansion of `{{csc:}}` / `{{vsc:}}` / `{{def:}}` terminology embeds
-- [ ] drawio / PlantUML / Mermaid diagram rendering
-- [ ] Live skin switcher component
+- Portfolio (GitBook source): <https://helex-solutions.github.io/ib-portfolio/>
+- TermX tutorial (TermX source, en/lt): <https://termx-health.github.io/tutorial/>
 
 ## License
 
