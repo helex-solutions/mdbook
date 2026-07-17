@@ -1,0 +1,38 @@
+/* Base layout refinements shared by all skins. Skin files set the palette. */
+:root {
+  --mdbook-content-max: 60rem;
+}
+
+/* Slightly wider, more book-like content column. */
+.VPDoc:not(.has-aside) .content-container {
+  max-width: var(--mdbook-content-max);
+}
+
+/* Home hero image rounding used by GitBook-style profile shots. */
+.vp-doc img {
+  border-radius: 6px;
+}
+
+/* GitBook `icon:` frontmatter rendered in the sidebar/menu labels. */
+.mdbook-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  margin-right: 0.55em;
+  opacity: 0.8;
+  vertical-align: -0.1em;
+}
+.mdbook-icon-svg {
+  width: 1em;
+  height: 1em;
+}
+.VPSidebarItem.is-active > .item .mdbook-icon {
+  opacity: 1;
+  color: var(--vp-c-brand-1);
+}
+
+/* Attribute-list image sizing helpers ({.m-rounded} {align=right}). */
+.vp-doc img.m-rounded { border-radius: 50%; }
+.vp-doc img.m-raised { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); }
+.vp-doc [align='right'] { text-align: right; }

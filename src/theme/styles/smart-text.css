@@ -1,0 +1,242 @@
+/* Styling for TermX / Wiki.js "smart text" produced by the markdown plugins. */
+
+/* Callout blockquotes: `> text {.is-info}` etc. markdown-it-attrs puts the class
+ * on the inner <p>, so match the blockquote that contains it (also support the
+ * class landing directly on the blockquote). Semantic colours like the TermX SSG. */
+.vp-doc blockquote:has(> .is-info),
+.vp-doc blockquote:has(> .is-warning),
+.vp-doc blockquote:has(> .is-success),
+.vp-doc blockquote:has(> .is-error),
+.vp-doc blockquote.is-info,
+.vp-doc blockquote.is-warning,
+.vp-doc blockquote.is-success,
+.vp-doc blockquote.is-error {
+  border-radius: 6px;
+  border-left-width: 3px;
+  padding: 8px 14px;
+  margin: 1rem 0;
+}
+.vp-doc blockquote:has(> .is-info), .vp-doc blockquote.is-info { border-left-color: #2c84fa; background: rgba(44, 132, 250, 0.14); }
+.vp-doc blockquote:has(> .is-success), .vp-doc blockquote.is-success { border-left-color: #22a06b; background: rgba(34, 160, 107, 0.14); }
+.vp-doc blockquote:has(> .is-warning), .vp-doc blockquote.is-warning { border-left-color: #e0a800; background: rgba(224, 168, 0, 0.16); }
+.vp-doc blockquote:has(> .is-error), .vp-doc blockquote.is-error { border-left-color: #d64545; background: rgba(214, 69, 69, 0.14); }
+/* the inner paragraph carries the class but needs no box of its own */
+.vp-doc blockquote > p.is-info,
+.vp-doc blockquote > p.is-warning,
+.vp-doc blockquote > p.is-success,
+.vp-doc blockquote > p.is-error { margin: 0; }
+
+/* Link lists: `- [..](..)` list tagged {.links-list}. Mirrors the TermX SSG:
+ * shadow cards with a 4px left accent bar that turns brand-coloured on the
+ * current row (hover, or the item linking to the current page). A link's
+ * trailing `*em*` becomes a divider-separated subtitle section. */
+.vp-doc ul.links-list {
+  list-style: none;
+  padding-left: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.vp-doc ul.links-list > li {
+  padding: 1rem;
+  border-radius: 8px;
+  background: linear-gradient(to bottom, var(--vp-c-bg), var(--vp-c-bg-soft));
+  border-right: 1px solid var(--vp-c-divider);
+  border-bottom: 1px solid var(--vp-c-divider);
+  border-left: 4px solid var(--vp-c-divider);
+  box-shadow: 0 3px 8px 0 rgba(116, 129, 141, 0.1);
+  transition: border-left-color 0.2s;
+}
+.vp-doc ul.links-list > li::before { content: none; }
+.vp-doc ul.links-list > li:hover,
+.vp-doc ul.links-list > li.is-current {
+  border-left-color: var(--vp-c-brand-1);
+  cursor: pointer;
+}
+.vp-doc ul.links-list > li > a {
+  display: block;
+  text-decoration: none;
+  margin: -1rem;
+  padding: 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+}
+/* second section: `*subtitle*` inside the link — plain text, vertical divider */
+.vp-doc ul.links-list > li > a em {
+  font-weight: 400;
+  font-style: normal;
+  color: var(--vp-c-text-1);
+  display: inline-block;
+  padding-left: 0.5rem;
+  margin-left: 0.5rem;
+  border-left: 1px solid var(--vp-c-divider);
+}
+
+/* Dense: {.dense} — compact spacing on tables and lists. */
+.vp-doc table.dense th,
+.vp-doc table.dense td { padding: 3px 8px; font-size: 0.85em; }
+.vp-doc ul.dense li,
+.vp-doc ol.dense li { margin: 0; }
+
+/* Grid lists: {.grid-list} — zebra-striped stacked rows. */
+.vp-doc ul.grid-list {
+  list-style: none;
+  padding-left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.vp-doc ul.grid-list > li {
+  padding: 8px 16px;
+  margin: 0;
+}
+.vp-doc ul.grid-list > li:nth-child(odd) { background: var(--vp-c-bg-soft); }
+.vp-doc ul.grid-list > li:nth-child(even) { background: var(--vp-c-bg); }
+
+/* Collapsible +++ blocks. */
+.vp-doc details.mdbook-collapsible {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 0.4rem 0.9rem;
+  margin: 1rem 0;
+}
+.vp-doc details.mdbook-collapsible > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* Tabsets: `## {.tabset}` groups -> pure-CSS tabs (input:checked + label + .tab). */
+.vp-doc .mdbook-tabset {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+.vp-doc .mdbook-tabset > .mdbook-tab-radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.vp-doc .mdbook-tabset > .mdbook-tab-label {
+  order: 1;
+  padding: 0.5em 1em;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--vp-c-text-2);
+  font-weight: 500;
+  transition: color 0.2s, border-color 0.2s;
+}
+.vp-doc .mdbook-tabset > .mdbook-tab-label:hover { color: var(--vp-c-text-1); }
+.vp-doc .mdbook-tabset > .mdbook-tab {
+  order: 2;
+  flex-basis: 100%;
+  width: 100%;
+  display: none;
+  padding: 1rem 2px;
+}
+.vp-doc .mdbook-tabset > .mdbook-tab-radio:checked + .mdbook-tab-label {
+  color: var(--vp-c-brand-1);
+  border-bottom-color: var(--vp-c-brand-1);
+}
+.vp-doc .mdbook-tabset > .mdbook-tab-radio:checked + .mdbook-tab-label + .mdbook-tab {
+  display: block;
+}
+.vp-doc .mdbook-tabset > .mdbook-tab > :first-child { margin-top: 0; }
+/* keyboard focus visibility */
+.vp-doc .mdbook-tabset > .mdbook-tab-radio:focus-visible + .mdbook-tab-label {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+
+/* Diagrams: drawio (data-URI SVG), plantuml (server SVG), mermaid (client SVG). */
+.vp-doc .mdbook-drawio,
+.vp-doc .mdbook-plantuml,
+.vp-doc .mermaid-diagram {
+  margin: 1rem 0;
+  text-align: center;
+}
+.vp-doc img.drawio,
+.vp-doc img.plantuml { max-width: 100%; height: auto; }
+.vp-doc .mermaid-diagram svg { max-width: 100%; height: auto; }
+.vp-doc .mermaid-diagram .mermaid-fallback { display: none; } /* hidden until JS renders */
+.vp-doc .mermaid-diagram:not([data-rendered]) .mermaid-fallback {
+  display: block;
+  opacity: 0.6;
+}
+
+/* Concept matrices: {{csc:…}} / {{vsc:…}} expanded from the FHIR server. */
+.vp-doc .mdbook-concept-matrix {
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+.vp-doc .mdbook-concept-matrix table { width: 100%; }
+.vp-doc .mdbook-concept-matrix th { text-transform: capitalize; }
+
+/* Include cards: standalone {{def:…}} {{csc:…}} {{vsc:…}}. */
+.vp-doc .mdbook-include {
+  border: 1px solid var(--vp-c-divider);
+  border-left: 3px solid var(--vp-c-brand-1);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 1rem 0;
+  background: var(--vp-c-bg-soft);
+}
+.vp-doc .mdbook-include-head { display: flex; align-items: center; gap: 0.5em; flex-wrap: wrap; }
+.vp-doc .mdbook-include-kind {
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 700;
+  color: var(--vp-c-brand-1);
+}
+.vp-doc .mdbook-include-params { margin-top: 4px; font-size: 0.85em; color: var(--vp-c-text-2); }
+
+/* GitBook card grids (<table data-view="cards"> -> .mdbook-cards). */
+.vp-doc .mdbook-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.vp-doc .mdbook-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--vp-c-bg-soft);
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+}
+.vp-doc .mdbook-card:hover {
+  border-color: var(--vp-c-brand-1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+.vp-doc .mdbook-card-cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  margin: 0;
+  border-radius: 0;
+}
+.vp-doc .mdbook-card-body {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vp-doc .mdbook-card-title {
+  font-weight: 700;
+  line-height: 1.3;
+}
+.vp-doc .mdbook-card-title a { font-weight: 700; }
+.vp-doc .mdbook-card-field {
+  font-size: 0.9em;
+  color: var(--vp-c-text-2);
+}
+/* First field after the title reads as an italic subtitle (role/subtitle). */
+.vp-doc .mdbook-card-field:first-of-type em { font-style: italic; }

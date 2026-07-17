@@ -1,0 +1,45 @@
+/* Skin: helex — HELEX Solutions brand.
+ * green #3cb6ab (primary), blue #2b59c3 (headings), orange #ff7d01 (accents).
+ * Mirrors ~/bin/md2pdf-helex.css for on-brand web output. */
+:root {
+  --hlx-green: #3cb6ab;
+  --hlx-blue: #2b59c3;
+  --hlx-orange: #ff7d01;
+
+  /* Brand drives links, active nav, buttons. */
+  --vp-c-brand-1: #2f9d92; /* green, darkened for AA contrast on white */
+  --vp-c-brand-2: #3cb6ab;
+  --vp-c-brand-3: #57c6bc;
+  --vp-c-brand-soft: rgba(60, 182, 171, 0.14);
+
+  --vp-font-family-base: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+/* Blue headings with green/orange accents. */
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3 {
+  color: var(--hlx-blue);
+}
+.vp-doc h2 {
+  border-bottom: 2px solid var(--hlx-green);
+  padding-bottom: 0.3rem;
+}
+.vp-doc h3::before {
+  content: '▸ ';
+  color: var(--hlx-orange);
+  font-weight: 700;
+}
+
+/* Branded gradient divider. */
+.vp-doc hr {
+  border: none;
+  height: 2px;
+  background: linear-gradient(to right, var(--hlx-green), var(--hlx-blue), var(--hlx-orange));
+}
+
+/* Brand-blue table headers. */
+.vp-doc table th {
+  background: var(--hlx-blue);
+  color: #fff;
+}
