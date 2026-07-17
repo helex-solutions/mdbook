@@ -45,7 +45,9 @@ export function createMdbookConfig(bundle) {
     cleanUrls: bundle.cleanUrls ?? true,
     ignoreDeadLinks: true,
     lastUpdated: true,
-    markdown
+    markdown,
+    // <tx-sd-view> is the vendored StructureDefinition viewer web component.
+    vue: { template: { compilerOptions: { isCustomElement: (tag) => tag === 'tx-sd-view' } } }
   }
 
   // Single language: flat config. Multiple: VitePress `locales`.

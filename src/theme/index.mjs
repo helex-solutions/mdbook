@@ -8,6 +8,16 @@ import './styles/base.css'
 import './styles/smart-text.css'
 
 // Render every `.mermaid-diagram` placeholder produced by the markdown layer.
+// Register the vendored TermX StructureDefinition viewer web component
+// (<tx-sd-view>) once, on the client.
+async function registerSdViewer() {
+  if (typeof window === 'undefined') return
+  if (window.customElements?.get('tx-sd-view')) return
+  if (!document.querySelector('tx-sd-view')) return
+  const { initializeWebComponent } = await import('../../vendor/structure-definition-viewer/index.js')
+  if (!window.customElements.get('tx-sd-view')) initializeWebComponent('tx-sd-view')
+}
+
 async function renderMermaid() {
   if (typeof document === 'undefined') return
   const nodes = document.querySelectorAll('.mermaid-diagram:not([data-rendered])')
@@ -32,11 +42,15 @@ export default {
   extends: DefaultTheme,
   setup() {
     const route = useRoute()
-    onMounted(() => {
+    const run = () => {
       renderMermaid()
+      registerSdViewer()
+    }
+    onMounted(() => {
+      run()
       watch(
         () => route.path,
-        () => nextTick(renderMermaid)
+        () => nextTick(run)
       )
     })
   }
