@@ -20,6 +20,14 @@ export function applyMarkdown(md, opts = {}) {
   // Community plugins matching the TermX Wiki renderer's syntax.
   md.use(attrs, { allowedAttributes: [] }) // {.is-info} {width=800 align=right} …
   md.use(multimdTable, { multiline: true, rowspan: true, headerless: true }) // ^^ ||| headerless tables
+
+  // markdown-it-attrs' table transform reads token.meta.colsnum; multimd-table
+  // tokens can have a null meta, which crashes it. Ensure every block token has
+  // a meta object before curly_attributes runs.
+  md.core.ruler.before('curly_attributes', 'mdbook_ensure_meta', (state) => {
+    for (const t of state.tokens) if (t.meta == null) t.meta = {}
+    return false
+  })
   md.use(mark) // ==highlight==
   md.use(sub) // H~2~O
   md.use(sup) // x^2^
