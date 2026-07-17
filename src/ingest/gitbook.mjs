@@ -4,6 +4,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { walkMarkdown } from './util.mjs'
+import { iconMarkup } from '../icons.mjs'
 
 const ITEM_RE = /^(\s*)[*-]\s+\[([^\]]*)\]\(([^)]+)\)/
 const GROUP_RE = /^##\s+(.+?)\s*$/
@@ -25,6 +26,7 @@ export function ingestGitbook(cfg) {
   const sidebar = fs.existsSync(summaryPath)
     ? parseSummary(fs.readFileSync(summaryPath, 'utf8'))
     : []
+  decorateIcons(sidebar, root) // prepend GitBook `icon:` frontmatter as SVGs
 
   const homeRel = cfg.source.home || 'README.md'
   let title = cfg.site.title
@@ -61,6 +63,38 @@ export function ingestGitbook(cfg) {
     spaceNames: { [lang]: title || path.basename(cfg.projectRoot) },
     contentFiles,
     assets
+  }
+}
+
+// Resolve a clean sidebar link back to its source markdown file.
+function linkToFile(root, link) {
+  if (link === '/') return path.join(root, 'README.md')
+  const rel = link.replace(/^\//, '')
+  for (const cand of [`${rel}.md`, path.join(rel, 'README.md')]) {
+    const abs = path.join(root, cand)
+    if (fs.existsSync(abs)) return abs
+  }
+  return null
+}
+
+// Read the `icon:` value from a markdown file's YAML frontmatter.
+function readIcon(file) {
+  if (!file || !fs.existsSync(file)) return null
+  const text = fs.readFileSync(file, 'utf8')
+  const fm = text.match(/^---\s*\n([\s\S]*?)\n---/)
+  if (!fm) return null
+  const m = fm[1].match(/^icon:\s*(.+?)\s*$/m)
+  return m ? m[1].replace(/['"]/g, '') : null
+}
+
+// Walk the sidebar tree and prepend each linked page's icon to its label.
+function decorateIcons(items, root) {
+  for (const item of items) {
+    if (item.link) {
+      const icon = iconMarkup(readIcon(linkToFile(root, item.link)))
+      if (icon) item.text = icon + item.text
+    }
+    if (item.items) decorateIcons(item.items, root)
   }
 }
 
