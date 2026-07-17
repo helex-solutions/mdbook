@@ -3,6 +3,7 @@
 // directly. `applyMarkdown(md, opts)` is called from the VitePress `markdown.config`
 // hook. Each plugin is small and independently toggleable.
 import attrs from 'markdown-it-attrs'
+import multimdTable from 'markdown-it-multimd-table'
 import mark from 'markdown-it-mark'
 import sub from 'markdown-it-sub'
 import sup from 'markdown-it-sup'
@@ -18,6 +19,7 @@ import { diagrams } from './diagrams.mjs'
 export function applyMarkdown(md, opts = {}) {
   // Community plugins matching the TermX Wiki renderer's syntax.
   md.use(attrs, { allowedAttributes: [] }) // {.is-info} {width=800 align=right} …
+  md.use(multimdTable, { multiline: true, rowspan: true, headerless: true }) // ^^ ||| headerless tables
   md.use(mark) // ==highlight==
   md.use(sub) // H~2~O
   md.use(sup) // x^2^

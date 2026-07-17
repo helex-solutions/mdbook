@@ -46,7 +46,8 @@ function makeBundle(cfg, model) {
     logo: cfg.site.logo,
     outDir: cfg.build.out,
     cleanUrls: cfg.build.cleanUrls,
-    assetBase: '/attachments'
+    assetBase: '/attachments',
+    breaks: cfg.source.format === 'termx' // TermX Wiki uses breaks:true
   }
 }
 

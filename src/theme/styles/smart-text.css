@@ -47,6 +47,12 @@
 }
 .vp-doc ul.links-list > li > a { font-weight: 500; }
 
+/* Dense: {.dense} — compact spacing on tables and lists. */
+.vp-doc table.dense th,
+.vp-doc table.dense td { padding: 3px 8px; font-size: 0.85em; }
+.vp-doc ul.dense li,
+.vp-doc ol.dense li { margin: 0; }
+
 /* Grid lists: {.grid-list} — soft-filled stacked rows, like the TermX SSG. */
 .vp-doc ul.grid-list {
   list-style: none;

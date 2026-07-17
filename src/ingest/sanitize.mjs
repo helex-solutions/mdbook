@@ -8,5 +8,10 @@ export function sanitizeTermxMarkdown(text) {
   // which Vue rejects ("Element is missing end tag"). Drop them.
   out = out.replace(/<\/?span[^>]*>/gi, '')
 
+  // A standalone `{.dense}` after a multimd table can't be attached by
+  // markdown-it-attrs (different token shape) and would render as literal text.
+  // Drop the orphan so it doesn't show; dense styling on tables is not applied.
+  out = out.replace(/^\{\.dense\}\s*$/gm, '')
+
   return out
 }

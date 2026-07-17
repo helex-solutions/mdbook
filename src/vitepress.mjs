@@ -26,6 +26,8 @@ export function createMdbookConfig(bundle) {
   const { defaultLang, langs = [defaultLang], spaceNames = {} } = bundle
 
   const markdown = {
+    // TermX Wiki renders single newlines as <br> (markdown-it breaks:true).
+    breaks: bundle.breaks ?? false,
     config: (md) =>
       applyMarkdown(md, {
         web: bundle.web,
