@@ -12,6 +12,7 @@ import { sanitizeTermxMarkdown } from './ingest/sanitize.mjs'
 import { fixStagedImages } from './ingest/images.mjs'
 import { transformGitbookCards } from './ingest/cards.mjs'
 import { expandStructureDefinitions } from './ingest/structure-definition.mjs'
+import { expandConceptMatrices } from './ingest/concept-matrix.mjs'
 
 const MDBOOK_SRC = path.dirname(fileURLToPath(import.meta.url)) // .../mdbook/src
 
@@ -43,6 +44,7 @@ function makeBundle(cfg, model) {
     userSidebarExtra: cfg.sidebarExtra,
     search: cfg.search,
     web: model.web || null,
+    txServer: cfg.txServer,
     logo: cfg.site.logo,
     outDir: cfg.build.out,
     cleanUrls: cfg.build.cleanUrls,
@@ -142,6 +144,10 @@ async function prepare(projectRoot, overrides = {}) {
     `ingested ${pc.bold(model.contentFiles.length)} pages, langs [${model.langs.join(', ')}]`
   )
   const staging = stageContent(cfg, model)
+  if (cfg.source.format === 'termx' && cfg.txServer) {
+    log(`expanding {{csc}}/{{vsc}} from ${pc.dim(cfg.txServer)}`)
+    await expandConceptMatrices(staging, cfg.txServer)
+  }
   writeVitepressProject(cfg, model, staging)
   return { cfg, model, staging }
 }

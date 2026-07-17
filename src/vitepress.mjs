@@ -31,6 +31,7 @@ export function createMdbookConfig(bundle) {
     config: (md) =>
       applyMarkdown(md, {
         web: bundle.web,
+        txServer: bundle.txServer,
         assetBase: bundle.assetBase || '/attachments'
         // langPrefix is applied per-locale below via separate md instances is not
         // possible in VitePress (single md), so page: links resolve to root-relative;

@@ -140,6 +140,14 @@
   opacity: 0.6;
 }
 
+/* Concept matrices: {{csc:…}} / {{vsc:…}} expanded from the FHIR server. */
+.vp-doc .mdbook-concept-matrix {
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+.vp-doc .mdbook-concept-matrix table { width: 100%; }
+.vp-doc .mdbook-concept-matrix th { text-transform: capitalize; }
+
 /* Include cards: standalone {{def:…}} {{csc:…}} {{vsc:…}}. */
 .vp-doc .mdbook-include {
   border: 1px solid var(--vp-c-divider);

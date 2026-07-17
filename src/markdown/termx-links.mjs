@@ -25,6 +25,7 @@ function withVersion(kind, v) {
 
 export function termxLinks(md, opts = {}) {
   const web = (opts.web || '').replace(/\/$/, '')
+  const txServer = (opts.txServer || '').replace(/\/$/, '')
   const langPrefix = opts.langPrefix ? `/${opts.langPrefix}` : ''
   const defaultRender =
     md.renderer.rules.link_open || ((tokens, idx, o, env, self) => self.renderToken(tokens, idx, o))
@@ -34,14 +35,17 @@ export function termxLinks(md, opts = {}) {
     const hrefIdx = token.attrIndex('href')
     if (hrefIdx >= 0) {
       const raw = decodeURIComponent(token.attrs[hrefIdx][1])
-      const resolved = resolve(raw, web, langPrefix)
+      const resolved = resolve(raw, web, txServer, langPrefix)
       if (resolved != null) token.attrs[hrefIdx][1] = resolved
     }
     return defaultRender(tokens, idx, options, env, self)
   }
 }
 
-function resolve(href, web, langPrefix) {
+// FHIR resource type per link scheme (used when only txServer is configured).
+const FHIR_TYPE = { cs: 'CodeSystem', csv: 'CodeSystem', vs: 'ValueSet', vsv: 'ValueSet', ms: 'ConceptMap', msv: 'ConceptMap' }
+
+function resolve(href, web, txServer, langPrefix) {
   const m = href.match(/^([a-z]+):(.+)$/i)
   if (!m) return null
   const scheme = m[1].toLowerCase()
@@ -51,15 +55,26 @@ function resolve(href, web, langPrefix) {
     const slug = value.includes('/') ? value.split('/').pop() : value
     return `${langPrefix}/${slug}`.replace(/\/+/g, '/')
   }
+
+  // Prefer the TermX web UI (nice pages); fall back to FHIR resource URLs on
+  // txServer when no web UI base is configured.
   if (scheme === 'concept') {
     const [cs, code] = value.split('|')
-    if (cs === 'snomed-ct') return `${web}/integration/snomed/dashboard/${code}`
-    return `${web}/resources/code-systems/${cs}/concepts/${code}/view`
+    if (web) {
+      if (cs === 'snomed-ct') return `${web}/integration/snomed/dashboard/${code}`
+      return `${web}/resources/code-systems/${cs}/concepts/${code}/view`
+    }
+    if (txServer) return `${txServer}/CodeSystem/${cs}`
+    return null
   }
   if (scheme === 'namespace') {
     const [ns] = value.split('|')
-    return `${web}/resources/namespaces/${ns}`
+    return web ? `${web}/resources/namespaces/${ns}` : null
   }
-  if (RESOURCE[scheme]) return `${web}/${RESOURCE[scheme](value)}`
+  if (RESOURCE[scheme]) {
+    if (web) return `${web}/${RESOURCE[scheme](value)}`
+    if (txServer && FHIR_TYPE[scheme]) return `${txServer}/${FHIR_TYPE[scheme]}/${value.split('|')[0]}`
+    return null
+  }
   return null // http(s), mailto, etc. — leave untouched
 }

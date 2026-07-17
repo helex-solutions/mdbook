@@ -48,6 +48,9 @@ export function loadConfig(projectRoot, overrides = {}) {
       ...sourceDefaults,
       ...(data.source || {})
     },
+    // FHIR terminology server base (…/fhir) for expanding {{csc:}}/{{vsc:}} at
+    // build time and for cs:/vs: links. Accepts `txServer` or `tx-server`.
+    txServer: (data.txServer || data['tx-server'] || null)?.replace?.(/\/$/, '') || null,
     theme: {
       skin: data.theme?.skin || 'default',
       accent: data.theme?.accent || null,

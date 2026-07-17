@@ -44,8 +44,8 @@ Legend: ✅ full parity · 🟡 works with a caveat · 🔴 not supported static
 | Mermaid | ` ```mermaid ` | ✅ | Rendered client-side (mermaid) |
 | PlantUML | ` ```plantuml ` | ✅ | Encoded to the PlantUML server (`plantuml.com`) — needs internet at view time |
 | Include: StructureDefinition | `{{def:code; type=diff\|snap\|hybrid}}` | ✅ | Rendered by the vendored `@termx-health/structure-definition-viewer` from the exported `__source/resources/structure-definition/<code>.json` |
-| Include: CodeSystem concepts | `{{csc:code\|ver; properties=…; langs=…}}` | 🔴 | Card placeholder — the expansion data lives only on a running terminology server and isn't in the export |
-| Include: ValueSet concepts | `{{vsc:code\|ver; …}}` | 🔴 | Card placeholder — same reason |
+| Include: CodeSystem concepts | `{{csc:code\|ver; properties=…; langs=…; limit=…}}` | ✅ | Fetched at build time from the FHIR server (`txServer`): `GET {txServer}/CodeSystem/{code}` → inline `concept[]`. Falls back to a card if `txServer` is unset or the fetch fails |
+| Include: ValueSet concepts | `{{vsc:code\|ver; …}}` | ✅ | Fetched at build time: `GET {txServer}/ValueSet/{code}/$expand?includeDesignations=true` → `expansion.contains[]`. Same fallback |
 
 ## Editor-only features (not applicable to a static site)
 
@@ -69,14 +69,25 @@ Legend: ✅ full parity · 🟡 works with a caveat · 🔴 not supported static
 - **Home page.** The TermX SSG lands on the first page (e.g. `/en/about`); mdbook maps the
   first page to the site root (`/`) and also keeps it at its slug.
 
+## Configuration for terminology
+
+Terminology directives and links use a **FHIR server**, set once in `.mdbook/config.yml`:
+
+```yaml
+tx-server: https://your-termx-host/api/fhir   # FHIR API base (…/fhir)
+```
+
+- `{{csc:}}` / `{{vsc:}}` are expanded to tables at build time from this server.
+- `cs:` / `vs:` / `concept:` links resolve to the TermX web UI (`space.json.web`) when
+  available, otherwise to FHIR resource URLs on `tx-server`.
+
 ## To reach full parity later
 
-1. **`{{csc:}}` / `{{vsc:}}` expansion** — export the concept expansions to
-   `__source/resources/{code-system,value-set}/…` (as termx-server's `WikiExportController`
-   already does for PDF), then expand them to tables at build time like `{{def:}}`.
-2. **`{.dense}` on multimd tables** — pre-process the orphan marker onto the table element
+1. **`{.dense}` on multimd tables** — pre-process the orphan marker onto the table element
    during staging (markdown-it-attrs can't attach it after the multimd token).
-3. **Abbreviations** — add `markdown-it-abbr` to the markdown layer if any space uses `*[X]:`.
+2. **Abbreviations** — add `markdown-it-abbr` to the markdown layer if any space uses `*[X]:`.
+3. **Concept matrix columns** — the table shows `code`/`display`/`definition` and
+   designation- or property-based columns; exotic property projections may need mapping.
 
 ## Where these are implemented in mdbook
 
