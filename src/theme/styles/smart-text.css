@@ -1,19 +1,30 @@
 /* Styling for TermX / Wiki.js "smart text" produced by the markdown plugins. */
 
-/* Callout blockquotes: `> text {.is-info}` (also .is-warning/.is-success/.is-error). */
+/* Callout blockquotes: `> text {.is-info}` etc. markdown-it-attrs puts the class
+ * on the inner <p>, so match the blockquote that contains it (also support the
+ * class landing directly on the blockquote). Semantic colours like the TermX SSG. */
+.vp-doc blockquote:has(> .is-info),
+.vp-doc blockquote:has(> .is-warning),
+.vp-doc blockquote:has(> .is-success),
+.vp-doc blockquote:has(> .is-error),
 .vp-doc blockquote.is-info,
 .vp-doc blockquote.is-warning,
 .vp-doc blockquote.is-success,
 .vp-doc blockquote.is-error {
-  border-radius: 8px;
-  border-left-width: 4px;
-  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  border-left-width: 3px;
+  padding: 8px 14px;
   margin: 1rem 0;
 }
-.vp-doc blockquote.is-info { border-left-color: var(--vp-c-brand-1); background: var(--vp-c-brand-soft); }
-.vp-doc blockquote.is-warning { border-left-color: var(--vp-c-warning-1); background: var(--vp-c-warning-soft); }
-.vp-doc blockquote.is-success { border-left-color: var(--vp-c-tip-1, #10b981); background: var(--vp-c-tip-soft, rgba(16,185,129,.14)); }
-.vp-doc blockquote.is-error { border-left-color: var(--vp-c-danger-1); background: var(--vp-c-danger-soft); }
+.vp-doc blockquote:has(> .is-info), .vp-doc blockquote.is-info { border-left-color: #2c84fa; background: rgba(44, 132, 250, 0.14); }
+.vp-doc blockquote:has(> .is-success), .vp-doc blockquote.is-success { border-left-color: #22a06b; background: rgba(34, 160, 107, 0.14); }
+.vp-doc blockquote:has(> .is-warning), .vp-doc blockquote.is-warning { border-left-color: #e0a800; background: rgba(224, 168, 0, 0.16); }
+.vp-doc blockquote:has(> .is-error), .vp-doc blockquote.is-error { border-left-color: #d64545; background: rgba(214, 69, 69, 0.14); }
+/* the inner paragraph carries the class but needs no box of its own */
+.vp-doc blockquote > p.is-info,
+.vp-doc blockquote > p.is-warning,
+.vp-doc blockquote > p.is-success,
+.vp-doc blockquote > p.is-error { margin: 0; }
 
 /* Link lists: `- [..](..)` list tagged {.links-list}.
  * Matches the TermX SSG: full-width, shadow-elevated, rounded cards. */
@@ -36,13 +47,19 @@
 }
 .vp-doc ul.links-list > li > a { font-weight: 500; }
 
-/* Grid lists: {.grid-list}. */
+/* Grid lists: {.grid-list} — soft-filled stacked rows, like the TermX SSG. */
 .vp-doc ul.grid-list {
   list-style: none;
   padding-left: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vp-doc ul.grid-list > li {
+  background: var(--vp-c-bg-soft);
+  border-radius: 4px;
+  padding: 8px 16px;
+  margin: 0;
 }
 
 /* Collapsible +++ blocks. */
@@ -55,6 +72,50 @@
 .vp-doc details.mdbook-collapsible > summary {
   cursor: pointer;
   font-weight: 600;
+}
+
+/* Tabsets: `## {.tabset}` groups -> pure-CSS tabs (input:checked + label + .tab). */
+.vp-doc .mdbook-tabset {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+.vp-doc .mdbook-tabset > .mdbook-tab-radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.vp-doc .mdbook-tabset > .mdbook-tab-label {
+  order: 1;
+  padding: 0.5em 1em;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--vp-c-text-2);
+  font-weight: 500;
+  transition: color 0.2s, border-color 0.2s;
+}
+.vp-doc .mdbook-tabset > .mdbook-tab-label:hover { color: var(--vp-c-text-1); }
+.vp-doc .mdbook-tabset > .mdbook-tab {
+  order: 2;
+  flex-basis: 100%;
+  width: 100%;
+  display: none;
+  padding: 1rem 2px;
+}
+.vp-doc .mdbook-tabset > .mdbook-tab-radio:checked + .mdbook-tab-label {
+  color: var(--vp-c-brand-1);
+  border-bottom-color: var(--vp-c-brand-1);
+}
+.vp-doc .mdbook-tabset > .mdbook-tab-radio:checked + .mdbook-tab-label + .mdbook-tab {
+  display: block;
+}
+.vp-doc .mdbook-tabset > .mdbook-tab > :first-child { margin-top: 0; }
+/* keyboard focus visibility */
+.vp-doc .mdbook-tabset > .mdbook-tab-radio:focus-visible + .mdbook-tab-label {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
 }
 
 /* drawio inline SVGs. */

@@ -12,6 +12,7 @@ import { termxLinks } from './termx-links.mjs'
 import { termxImages } from './termx-images.mjs'
 import { termxEmbeds } from './termx-embeds.mjs'
 import { collapsible } from './collapsible.mjs'
+import { tabset } from './tabset.mjs'
 
 export function applyMarkdown(md, opts = {}) {
   // Community plugins matching the TermX Wiki renderer's syntax.
@@ -25,6 +26,7 @@ export function applyMarkdown(md, opts = {}) {
   // TermX-specific "smart text".
   md.use(termxEmbeds) // {{def:…}} {{csc:…}} {{vsc:…}} -> Vue-safe inline code
   md.use(collapsible) // +++ Title … +++  ->  <details>
+  md.use(tabset) // ## {.tabset} + ### tabs  ->  pure-CSS tabs
   md.use(termxLinks, opts) // [t](page:slug) [t](cs:code) [t](vs:code) [t](concept:cs|code)
   md.use(termxImages, opts) // ![](files/<pageId>/<file>)
 
