@@ -11,6 +11,7 @@ import { copyDir } from './ingest/util.mjs'
 import { sanitizeTermxMarkdown } from './ingest/sanitize.mjs'
 import { fixStagedImages } from './ingest/images.mjs'
 import { transformGitbookCards } from './ingest/cards.mjs'
+import { transformFileEmbeds } from './ingest/file-embed.mjs'
 import { expandStructureDefinitions } from './ingest/structure-definition.mjs'
 import { expandConceptMatrices } from './ingest/concept-matrix.mjs'
 
@@ -103,6 +104,7 @@ function stageContent(cfg, model) {
         text = expandStructureDefinitions(text, sdDirs) // {{def:…}} -> <tx-sd-view>
       }
       text = transformGitbookCards(text) // GitBook card tables -> card grid
+      text = transformFileEmbeds(text, cfg.site.base) // {% file %} -> PDF/download card
       fs.writeFileSync(dest, text)
     } else {
       fs.copyFileSync(f.src, dest)
