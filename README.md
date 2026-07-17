@@ -10,7 +10,7 @@ Wiki "smart text" plugins run natively.
 ## Features
 
 - 🔎 **Search** — built-in local full-text search (no external service)
-- 🎨 **Skins** — swappable themes (`default`, `ocean`, `paper`) via CSS-variable palettes
+- 🎨 **Skins** — swappable themes (`default`, `ocean`, `paper`, plus brand skins `helex` and `taltech`) via CSS-variable palettes
 - 🧭 **Custom menu** — nav & sidebar auto-generated from your content, extendable/overridable in config
 - 🖼️ **Assets** — GitBook `.gitbook/assets` and TermX `files/<id>/…` attachments handled automatically
 - 🌍 **Multilingual** — first-class locales, driven by the `lang` on TermX page contents
@@ -67,7 +67,7 @@ source:
   # termx:   meta, pages, assets
 
 theme:
-  skin: default                # default | ocean | paper
+  skin: default                # default | ocean | paper | helex | taltech
 
 search: true
 
