@@ -22,7 +22,7 @@ inputs:
   node-version:
     description: Node.js version to build with.
     required: false
-    default: '22'
+    default: '24'
 
 outputs:
   site:
