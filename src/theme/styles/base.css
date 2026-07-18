@@ -36,3 +36,14 @@
 .vp-doc img.m-rounded { border-radius: 50%; }
 .vp-doc img.m-raised { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); }
 .vp-doc [align='right'] { text-align: right; }
+
+/* Align the nav search box with the document content's left edge. */
+@media (min-width: 960px) {
+  .VPNavBarSearch { padding-left: 64px; }
+}
+
+/* Use a universally recognizable globe for the language switcher, instead of
+   the default translate glyph. */
+.VPNavBarTranslations .vpi-languages {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M2 12h20'/%3E%3Cpath d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z'/%3E%3C/svg%3E");
+}
