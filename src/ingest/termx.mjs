@@ -79,7 +79,7 @@ export function ingestTermx(cfg) {
         const dest = destFor(content.slug, lang)
         if (src && !seen.has(dest)) {
           seen.add(dest)
-          contentFiles.push({ src, dest, lang })
+          contentFiles.push({ src, dest, lang, title: content.name?.trim() || content.slug })
           pageCount[lang] = (pageCount[lang] || 0) + 1
         }
         const entry = { text: content.name?.trim() || content.slug, link: linkFor(content.slug, lang) }
@@ -120,7 +120,7 @@ export function ingestTermx(cfg) {
       const src = findPageFile(cfg, first.slug)
       if (src) {
         const dest = lang === defaultLang ? 'index.md' : `${lang}/index.md`
-        contentFiles.push({ src, dest, lang })
+        contentFiles.push({ src, dest, lang, title: first.name?.trim() || first.slug })
         home[lang] = dest
       }
     }

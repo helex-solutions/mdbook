@@ -22,6 +22,43 @@ function themeConfigFor(bundle, lang) {
   }
 }
 
+// The route path for a page (base-less), matching VitePress' own sitemap logic.
+function routeFor(relativePath, cleanUrls) {
+  return (relativePath || '')
+    .replace(/(^|\/)index\.md$/, '$1')
+    .replace(/\.md$/, cleanUrls ? '' : '.html')
+}
+
+// Per-page Open Graph / Twitter / canonical tags. Runs as a VitePress build
+// hook so each page carries its own title, description and (when the canonical
+// site URL is known) absolute URL.
+function seoHead(bundle) {
+  const { siteUrl, title: siteName, description: siteDesc, cleanUrls } = bundle
+  return (ctx) => {
+    const pd = ctx.pageData || {}
+    const title = pd.title || ctx.title || siteName
+    const description = pd.description || ctx.description || siteDesc || ''
+    const isHome = (pd.relativePath || '').replace(/(^|\/)index\.md$/, '$1') === ''
+    const tags = [
+      ['meta', { property: 'og:type', content: isHome ? 'website' : 'article' }],
+      ['meta', { property: 'og:title', content: title }],
+      ['meta', { property: 'og:site_name', content: siteName }],
+      ['meta', { name: 'twitter:card', content: 'summary' }],
+      ['meta', { name: 'twitter:title', content: title }]
+    ]
+    if (description) {
+      tags.push(['meta', { property: 'og:description', content: description }])
+      tags.push(['meta', { name: 'twitter:description', content: description }])
+    }
+    if (siteUrl) {
+      const url = new URL(routeFor(pd.relativePath, cleanUrls ?? true), siteUrl).toString()
+      tags.push(['meta', { property: 'og:url', content: url }])
+      tags.push(['link', { rel: 'canonical', href: url }])
+    }
+    return tags
+  }
+}
+
 export function createMdbookConfig(bundle) {
   const { defaultLang, langs = [defaultLang], spaceNames = {} } = bundle
 
@@ -50,6 +87,9 @@ export function createMdbookConfig(bundle) {
     cleanUrls: bundle.cleanUrls ?? true,
     ignoreDeadLinks: true,
     lastUpdated: true,
+    // SEO: sitemap.xml (when the canonical URL is known) + per-page OG tags.
+    ...(bundle.siteUrl ? { sitemap: { hostname: bundle.siteUrl } } : {}),
+    transformHead: seoHead(bundle),
     markdown,
     // <tx-sd-view> is the vendored StructureDefinition viewer web component.
     vue: { template: { compilerOptions: { isCustomElement: (tag) => tag === 'tx-sd-view' } } },

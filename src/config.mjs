@@ -31,6 +31,8 @@ export function loadConfig(projectRoot, overrides = {}) {
   const format = (data.source?.format || detectFormat(projectRoot) || 'gitbook').toLowerCase()
   const sourceDefaults = SOURCE_DEFAULTS[format] || {}
 
+  const siteBase = resolveBase({ explicit: overrides.base ?? data.site?.base, projectRoot })
+
   const cfg = {
     projectRoot,
     mdbookDir,
@@ -41,8 +43,10 @@ export function loadConfig(projectRoot, overrides = {}) {
       lang: data.site?.lang || 'en',
       logo: data.site?.logo || null,
       ...data.site,
-      // Resolved last so it wins over the spread. Auto-detected in CI.
-      base: resolveBase({ explicit: overrides.base ?? data.site?.base, projectRoot })
+      // Resolved last so they win over the spread. Auto-detected in CI.
+      base: siteBase,
+      // Canonical absolute URL (origin + base), used for sitemap/canonical/OG.
+      url: resolveSiteUrl({ explicit: data.site?.url, projectRoot, base: siteBase })
     },
     source: {
       format,
@@ -86,12 +90,42 @@ function normalizeBase(base) {
   return base
 }
 
+const CNAME_PATHS = ['CNAME', 'public/CNAME', '.gitbook/assets/CNAME']
+
 // A GitHub Pages custom domain (a CNAME file) means the site is served at the
 // domain root, so base is '/'.
 function hasCname(projectRoot) {
-  return ['CNAME', 'public/CNAME', '.gitbook/assets/CNAME'].some((p) =>
-    fs.existsSync(path.join(projectRoot, p))
-  )
+  return CNAME_PATHS.some((p) => fs.existsSync(path.join(projectRoot, p)))
+}
+
+// The custom domain from a CNAME file, if any.
+function readCname(projectRoot) {
+  for (const p of CNAME_PATHS) {
+    const f = path.join(projectRoot, p)
+    if (fs.existsSync(f)) {
+      const domain = fs.readFileSync(f, 'utf8').trim().split(/\s+/)[0]
+      if (domain) return domain
+    }
+  }
+  return null
+}
+
+// Resolve the canonical absolute site URL (origin + base, trailing slash) used
+// for the sitemap, canonical links and Open Graph tags. Precedence:
+//   1. explicit site.url in config
+//   2. CNAME custom domain -> https://<domain>/<base>
+//   3. GitHub Actions -> https://<owner>.github.io/<base>
+//   4. null (local/unknown: relative-only, sitemap/canonical skipped)
+function resolveSiteUrl({ explicit, projectRoot, base }) {
+  if (explicit) return explicit.endsWith('/') ? explicit : explicit + '/'
+  let origin = null
+  const cname = readCname(projectRoot)
+  const repo = process.env.GITHUB_REPOSITORY
+  if (cname) origin = `https://${cname}`
+  else if (process.env.GITHUB_ACTIONS === 'true' && repo?.includes('/')) {
+    origin = `https://${repo.split('/')[0].toLowerCase()}.github.io`
+  }
+  return origin ? origin + base : null
 }
 
 // Resolve the site base path. Precedence:

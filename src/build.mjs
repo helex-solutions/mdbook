@@ -12,6 +12,7 @@ import { sanitizeTermxMarkdown } from './ingest/sanitize.mjs'
 import { fixStagedImages } from './ingest/images.mjs'
 import { transformGitbookCards } from './ingest/cards.mjs'
 import { transformFileEmbeds } from './ingest/file-embed.mjs'
+import { applySeoFrontmatter, deriveDescription } from './ingest/seo.mjs'
 import { expandStructureDefinitions } from './ingest/structure-definition.mjs'
 import { expandConceptMatrices } from './ingest/concept-matrix.mjs'
 
@@ -52,6 +53,7 @@ function makeBundle(cfg, model) {
     title: cfg.site.title || model.title,
     description: cfg.site.description,
     base: cfg.site.base,
+    siteUrl: cfg.site.url || null,
     defaultLang: model.defaultLang,
     langs: model.langs,
     spaceNames: model.spaceNames,
@@ -106,6 +108,8 @@ function stageContent(cfg, model) {
       }
       text = transformGitbookCards(text) // GitBook card tables -> card grid
       text = transformFileEmbeds(text, cfg.site.base) // {% file %} -> PDF/download card
+      // Per-page <title>/<meta description>: page name + first-paragraph summary.
+      text = applySeoFrontmatter(text, { title: f.title, description: deriveDescription(text) })
       fs.writeFileSync(dest, text)
     } else {
       fs.copyFileSync(f.src, dest)

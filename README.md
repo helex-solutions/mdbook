@@ -94,6 +94,8 @@ site:
   description: One-line summary
   lang: en                     # default locale
   base: /                      # set to /repo/ for GitHub project pages
+  url: https://example.org/    # optional canonical URL (auto-detected in CI);
+                               #   enables sitemap.xml, canonical + Open Graph URLs
   logo: /.gitbook/assets/logo.png
   web: https://example.org     # optional: base for cs:/vs:/page: web links
 
