@@ -117,7 +117,7 @@ function readCname(projectRoot) {
 //   2. CNAME custom domain -> https://<domain>/<base>
 //   3. GitHub Actions -> https://<owner>.github.io/<base>
 //   4. null (local/unknown: relative-only, sitemap/canonical skipped)
-function resolveSiteUrl({ explicit, projectRoot, base }) {
+export function resolveSiteUrl({ explicit, projectRoot, base }) {
   if (explicit) return explicit.endsWith('/') ? explicit : explicit + '/'
   let origin = null
   const cname = readCname(projectRoot)
@@ -135,7 +135,7 @@ function resolveSiteUrl({ explicit, projectRoot, base }) {
 //   3. GitHub Actions: /<repo>/ for a project page ('/' for a custom domain or
 //      an <owner>.github.io user/org page)
 //   4. '/'
-function resolveBase({ explicit, projectRoot }) {
+export function resolveBase({ explicit, projectRoot }) {
   if (explicit != null) return normalizeBase(explicit)
   if (process.env.MDBOOK_BASE) return normalizeBase(process.env.MDBOOK_BASE)
   const repo = process.env.GITHUB_REPOSITORY

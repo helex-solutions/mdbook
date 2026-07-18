@@ -24,7 +24,7 @@ function themeConfigFor(bundle, lang) {
 }
 
 // The route path for a page (base-less), matching VitePress' own sitemap logic.
-function routeFor(relativePath, cleanUrls) {
+export function routeFor(relativePath, cleanUrls) {
   return (relativePath || '')
     .replace(/(^|\/)index\.md$/, '$1')
     .replace(/\.md$/, cleanUrls ? '' : '.html')
@@ -32,7 +32,7 @@ function routeFor(relativePath, cleanUrls) {
 
 // Resolve an image path/URL to an absolute URL (needs the site URL for
 // site-relative paths). Returns null if it can't be made absolute.
-function absImage(image, siteUrl) {
+export function absImage(image, siteUrl) {
   if (!image) return null
   if (/^https?:\/\//i.test(image)) return image
   return siteUrl ? new URL(String(image).replace(/^\//, ''), siteUrl).toString() : null

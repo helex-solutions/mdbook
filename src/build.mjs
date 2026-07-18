@@ -13,6 +13,7 @@ import { fixStagedImages } from './ingest/images.mjs'
 import { transformGitbookCards } from './ingest/cards.mjs'
 import { transformFileEmbeds } from './ingest/file-embed.mjs'
 import { applySeoFrontmatter, deriveDescription } from './ingest/seo.mjs'
+import { auditLinks } from './ingest/links.mjs'
 import { expandStructureDefinitions } from './ingest/structure-definition.mjs'
 import { expandConceptMatrices } from './ingest/concept-matrix.mjs'
 
@@ -28,6 +29,17 @@ function ingest(cfg) {
   const adapter = ADAPTERS[cfg.source.format]
   if (!adapter) throw new Error(`Unknown source format: ${cfg.source.format}`)
   return adapter(cfg)
+}
+
+// Warn (never fail) about internal links that won't resolve on the static site.
+function reportDeadLinks(staging, model) {
+  const dead = auditLinks(staging, model)
+  if (!dead.length) return
+  log(pc.yellow(`${dead.length} internal link(s) may not resolve on the static site:`))
+  for (const d of dead.slice(0, 25)) {
+    console.log(`  ${pc.dim(path.relative(staging, d.file))}  →  ${d.href}`)
+  }
+  if (dead.length > 25) console.log(`  … and ${dead.length - 25} more`)
 }
 
 // The TermX web UI origin, derived from the FHIR server (…/api/fhir or …/fhir).
@@ -199,6 +211,7 @@ async function prepare(projectRoot, overrides = {}) {
     log(`expanding {{csc}}/{{vsc}} from ${pc.dim(cfg.txServer)}`)
     await expandConceptMatrices(staging, cfg.txServer)
   }
+  reportDeadLinks(staging, model)
   writeVitepressProject(cfg, model, staging)
   return { cfg, model, staging }
 }

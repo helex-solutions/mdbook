@@ -18,7 +18,8 @@
     "action.yml"
   ],
   "scripts": {
-    "test:portfolio": "node bin/mdbook.mjs build --project ../portfolio"
+    "test:portfolio": "node bin/mdbook.mjs build --project ../portfolio",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=20"
