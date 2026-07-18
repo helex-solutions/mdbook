@@ -10,6 +10,7 @@ function parseArgs(argv) {
     const a = argv[i]
     if (a === '--project' || a === '-p') args.project = argv[++i]
     else if (a === '--out' || a === '-o') args.out = argv[++i]
+    else if (a === '--base') args.base = argv[++i]
     else if (a === '--port') args.port = Number(argv[++i])
     else if (a === '--help' || a === '-h') args.help = true
     else args._.push(a)
@@ -26,6 +27,7 @@ Usage:
 Options:
   -p, --project <dir>   Project root containing .mdbook/ (default: cwd)
   -o, --out <dir>       Output directory (default: .mdbook/dist)
+      --base <path>     Base path (auto-detected from GITHUB_REPOSITORY in CI)
       --port <n>        Dev server port (default: 5173)
   -h, --help            Show this help
 `
@@ -40,6 +42,7 @@ async function main() {
   const projectRoot = path.resolve(args.project || process.cwd())
   const overrides = {}
   if (args.out) overrides.out = args.out
+  if (args.base) overrides.base = args.base
   if (args.port) overrides.port = args.port
 
   if (cmd === 'build') {

@@ -129,6 +129,16 @@ function stageContent(cfg, model) {
   // Resolve/neutralize image references so a missing asset can't fail the build.
   fixStagedImages(staging)
 
+  // Carry a custom-domain CNAME into the published output.
+  for (const c of ['CNAME', 'public/CNAME', '.gitbook/assets/CNAME']) {
+    const src = path.join(cfg.projectRoot, c)
+    if (fs.existsSync(src)) {
+      fs.mkdirSync(path.join(staging, 'public'), { recursive: true })
+      fs.copyFileSync(src, path.join(staging, 'public', 'CNAME'))
+      break
+    }
+  }
+
   return staging
 }
 
@@ -160,7 +170,7 @@ function writeVitepressProject(cfg, model, staging) {
 async function prepare(projectRoot, overrides = {}) {
   const cfg = loadConfig(projectRoot, overrides)
   log(`project ${pc.dim(cfg.projectRoot)}`)
-  log(`format ${pc.bold(cfg.source.format)}  skin ${pc.bold(cfg.theme.skin)}`)
+  log(`format ${pc.bold(cfg.source.format)}  skin ${pc.bold(cfg.theme.skin)}  base ${pc.bold(cfg.site.base)}`)
   const model = ingest(cfg)
   log(
     `ingested ${pc.bold(model.contentFiles.length)} pages, langs [${model.langs.join(', ')}]`

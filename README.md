@@ -72,8 +72,10 @@ TermX Wiki → mdbook feature matrix.
 
 4. **Push to `main`.** The workflow builds and publishes to `https://<owner>.github.io/<repo>/`.
 
-> For a project served under `/<repo>/` (not a custom domain), set `site.base: /<repo>/`
-> in the config so asset URLs resolve.
+> **Base path is auto-detected** in CI: `/<repo>/` for a project page, or `/` for a
+> custom domain (a `CNAME` file) or an `<owner>.github.io` user/org page. Override with
+> `site.base:` in config, the `base:` action input, or `--base`. A `CNAME` in the project
+> (root, `public/`, or `.gitbook/assets/`) is copied into the published site.
 
 ## Local preview
 

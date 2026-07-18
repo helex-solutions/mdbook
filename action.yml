@@ -13,6 +13,12 @@ inputs:
     description: Output directory for the built site (default <project>/.mdbook/dist).
     required: false
     default: ''
+  base:
+    description: >-
+      Site base path. Leave empty to auto-detect: /<repo>/ for a GitHub project
+      page, or / for a custom domain (CNAME) or an <owner>.github.io page.
+    required: false
+    default: ''
   node-version:
     description: Node.js version to build with.
     required: false
@@ -43,7 +49,9 @@ runs:
       run: |
         OUT_ARG=""
         if [ -n "${{ inputs.output }}" ]; then OUT_ARG="--out ${{ inputs.output }}"; fi
-        node "${{ github.action_path }}/bin/mdbook.mjs" build --project "${{ inputs.project }}" $OUT_ARG
+        BASE_ARG=""
+        if [ -n "${{ inputs.base }}" ]; then BASE_ARG="--base ${{ inputs.base }}"; fi
+        node "${{ github.action_path }}/bin/mdbook.mjs" build --project "${{ inputs.project }}" $OUT_ARG $BASE_ARG
         SITE="${{ inputs.output }}"
         if [ -z "$SITE" ]; then SITE="${{ inputs.project }}/.mdbook/dist"; fi
         echo "site=$SITE" >> "$GITHUB_OUTPUT"

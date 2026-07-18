@@ -39,9 +39,10 @@ export function loadConfig(projectRoot, overrides = {}) {
       title: data.site?.title || null, // resolved later from space.json / dir name
       description: data.site?.description || '',
       lang: data.site?.lang || 'en',
-      base: normalizeBase(data.site?.base || '/'),
       logo: data.site?.logo || null,
-      ...data.site
+      ...data.site,
+      // Resolved last so it wins over the spread. Auto-detected in CI.
+      base: resolveBase({ explicit: overrides.base ?? data.site?.base, projectRoot })
     },
     source: {
       format,
@@ -83,4 +84,31 @@ function normalizeBase(base) {
   if (!base.startsWith('/')) base = '/' + base
   if (!base.endsWith('/')) base += '/'
   return base
+}
+
+// A GitHub Pages custom domain (a CNAME file) means the site is served at the
+// domain root, so base is '/'.
+function hasCname(projectRoot) {
+  return ['CNAME', 'public/CNAME', '.gitbook/assets/CNAME'].some((p) =>
+    fs.existsSync(path.join(projectRoot, p))
+  )
+}
+
+// Resolve the site base path. Precedence:
+//   1. explicit --base / site.base in config
+//   2. MDBOOK_BASE env
+//   3. GitHub Actions: /<repo>/ for a project page ('/' for a custom domain or
+//      an <owner>.github.io user/org page)
+//   4. '/'
+function resolveBase({ explicit, projectRoot }) {
+  if (explicit != null) return normalizeBase(explicit)
+  if (process.env.MDBOOK_BASE) return normalizeBase(process.env.MDBOOK_BASE)
+  const repo = process.env.GITHUB_REPOSITORY
+  if (process.env.GITHUB_ACTIONS === 'true' && repo?.includes('/')) {
+    const [owner, name] = repo.split('/')
+    if (hasCname(projectRoot)) return '/'
+    if (name.toLowerCase() === `${owner.toLowerCase()}.github.io`) return '/'
+    return normalizeBase(name)
+  }
+  return '/'
 }
