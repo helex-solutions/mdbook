@@ -18,7 +18,7 @@ Wiki "smart text" runs natively.
 - 🔗 **Terminology** — `{{def:}}` StructureDefinition viewer, and `{{csc:}}`/`{{vsc:}}` concept tables fetched from a FHIR server at build time
 - 🏷️ **SEO** — per-page titles/descriptions, `sitemap.xml`, canonical + Open Graph/Twitter tags, JSON-LD and `robots.txt` (site URL auto-detected in CI)
 - 💬 **Comments** — optional [Giscus](https://giscus.app) (GitHub Discussions) box per page (see [Comments](#comments-github-discussions))
-- 🖥️ **Presentation mode** — a fullscreen, chrome-free view with prev/next controls for showing pages to an audience
+- 🖥️ **Presentation mode** — a fullscreen, chrome-free view with prev/next controls for showing pages to an audience (see [Presentation mode](#presentation-mode))
 
 See [`docs/termx-wiki-compatibility.md`](docs/termx-wiki-compatibility.md) for the full
 TermX Wiki → mdbook feature matrix.
@@ -169,6 +169,19 @@ mdbook can render a [Giscus](https://giscus.app) comment box after each page, ba
 Readers post with a one-time **“Sign in with GitHub”**; comments are stored as Discussions in the
 repo (moderate/reply there or inline), and the widget follows the site's light/dark theme. Omit the
 `comments` block to disable it.
+
+## Presentation mode
+
+A floating **⛶** button in the bottom-right corner of every page toggles a distraction-free view
+for showing pages to an audience: it requests fullscreen and hides the nav, sidebar and
+on-this-page aside, leaving only the article.
+
+- **‹ / ›** edge buttons — or the **← / →** keys (also PageUp/PageDown) — move to the previous/next
+  page in sidebar order.
+- **Esc**, or the button (now a ⤢ exit icon), leaves the mode.
+
+It stays on as you navigate and follows the site's light/dark theme. No configuration needed — the
+button is always available.
 
 ## How it works
 
