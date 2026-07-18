@@ -1,9 +1,10 @@
 // Rewrites TermX attachment image references.
-//   ![alt](files/<pageId>/<file>)  ->  <assetBase>/<pageId>/<file>
+//   ![alt](files/<folder>/<file>)  ->  <assetBase>/<folder>/<file>
 // Attachments are exported by termx-server to `attachments/<pageId>/<file>`;
-// mdbook stages them under a public assets dir. `assetBase` defaults to
-// `/attachments` (served from the site root).
-const FILE_RE = /^files\/(\d+)\/(.+)$/
+// mdbook stages them under a public assets dir. `<folder>` is usually the
+// numeric page id, but any name is accepted (e.g. files/wiki/x.png).
+// `assetBase` defaults to `/attachments` (served from the site root).
+const FILE_RE = /^files\/([\w.-]+)\/(.+)$/
 
 export function termxImages(md, opts = {}) {
   const assetBase = (opts.assetBase || '/attachments').replace(/\/$/, '')
