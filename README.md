@@ -56,7 +56,7 @@ TermX Wiki → mdbook feature matrix.
        steps:
          - uses: actions/checkout@v4
          - id: mdbook
-           uses: igorboss/mdbook@main
+           uses: igorboss/mdbook@v1.0.0   # pin to a release tag (see Versioning)
            with: { project: . }
          - uses: actions/configure-pages@v5
          - uses: actions/upload-pages-artifact@v3
@@ -79,6 +79,22 @@ TermX Wiki → mdbook feature matrix.
 > custom domain (a `CNAME` file) or an `<owner>.github.io` user/org page. Override with
 > `site.base:` in config, the `base:` action input, or `--base`. A `CNAME` in the project
 > (root, `public/`, or `.gitbook/assets/`) is copied into the published site.
+
+### Versioning
+
+Pin the action to a **release tag** (e.g. `igorboss/mdbook@v1.0.0`) so your site builds are
+deterministic — `main` can move without silently redeploying your site. See the
+[releases](https://github.com/igorboss/mdbook/releases). Use `@main` only if you want the
+latest, unreleased changes.
+
+**To publish a new mdbook version:**
+
+```bash
+git tag -a v1.0.1 -m "…" && git push origin v1.0.1   # patch; v1.1.0 for features
+```
+
+Then bump `@v1.0.0` → `@v1.0.1` in each consumer's `.github/workflows/mdbook.yml` and push —
+a deliberate step, so upgrades are reviewed rather than automatic.
 
 ## Local preview
 
