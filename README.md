@@ -56,7 +56,7 @@ TermX Wiki → mdbook feature matrix.
        steps:
          - uses: actions/checkout@v4
          - id: mdbook
-           uses: igorboss/mdbook@v1.0.0   # pin to a release tag (see Versioning)
+           uses: helex-solutions/mdbook@v1.1.2   # pin to a release tag (see Versioning)
            with: { project: . }
          - uses: actions/configure-pages@v5
          - uses: actions/upload-pages-artifact@v3
@@ -82,9 +82,9 @@ TermX Wiki → mdbook feature matrix.
 
 ### Versioning
 
-Pin the action to a **release tag** (e.g. `igorboss/mdbook@v1.0.0`) so your site builds are
+Pin the action to a **release tag** (e.g. `helex-solutions/mdbook@v1.1.2`) so your site builds are
 deterministic — `main` can move without silently redeploying your site. See the
-[releases](https://github.com/igorboss/mdbook/releases). Use `@main` only if you want the
+[releases](https://github.com/helex-solutions/mdbook/releases). Use `@main` only if you want the
 latest, unreleased changes.
 
 **To publish a new mdbook version:**
@@ -99,8 +99,8 @@ a deliberate step, so upgrades are reviewed rather than automatic.
 ## Local preview
 
 ```bash
-npx github:igorboss/mdbook build --project .   # build to .mdbook/dist
-npx github:igorboss/mdbook dev   --project .   # live-reload dev server
+npx github:helex-solutions/mdbook build --project .   # build to .mdbook/dist
+npx github:helex-solutions/mdbook dev   --project .   # live-reload dev server
 ```
 
 (`npx` clones the public repo and runs it; no npm publish needed. Requires Node ≥ 20.)
@@ -174,12 +174,48 @@ build:
 | Format | Detected by | Layout |
 |---|---|---|
 | `gitbook` | `SUMMARY.md` | `README.md` (home) + `SUMMARY.md` (nav) + `.gitbook/assets` |
-| `termx` | `__source/pages.json` or `input/pages.json` | `space.json` + `pages.json` + `input/*.md` (or `input/pagecontent/*.md`) |
+| `termx` | `pages.json` (in `__source/`, `input/`, or `source/`) | `space.json` + `pages.json` + page markdown (+ `attachments/`) |
 
-**Multilingual (gitbook).** The default language (`site.lang`) lives at the repo root; add a
-locale by creating a `<lang>/` subdirectory with its own `SUMMARY.md` + `README.md` + pages
-(e.g. `lt/SUMMARY.md`, `lt/README.md`, `lt/*.md`). It is served under `/<lang>/` and a
-language switcher appears automatically. `.gitbook/assets` is shared across locales.
+**TermX layout.** A TermX Wiki export — or a hand-authored equivalent — is `space.json`
+(space metadata), `pages.json` (the page tree) and one markdown file per page. The metadata
+and page directories are configurable:
+
+```yaml
+source:
+  format: termx
+  meta: source          # holds space.json + pages.json + attachments/  (default: __source)
+  pages: source/pages   # page markdown, one file per slug
+```
+
+`pages.json` is a tree of nodes; each node has a stable `code` and one `contents` entry per
+language (`name`, `slug`, `lang`):
+
+```json
+[
+  {
+    "code": "build",
+    "contents": [
+      { "name": "Builds",   "slug": "build",    "lang": "en" },
+      { "name": "Versijos", "slug": "versijos", "lang": "lt" }
+    ]
+  }
+]
+```
+
+TermX page bodies use `breaks: true` (a single newline becomes `<br>`), so keep each
+paragraph on one line. Images are attachments: `![](files/<id>/<file>)` (served from
+`/attachments/…`). See **[helex-solutions/mdbook § reference projects](#reference-projects)**
+for complete, working `space.json` / `pages.json` examples.
+
+**Multilingual.** The default language (`site.lang`) is served at the root (`/…`) and other
+locales under `/<lang>/…` (VitePress i18n); a language switcher appears automatically.
+
+- *gitbook*: add a `<lang>/` subdirectory with its own `SUMMARY.md` + `README.md` + pages
+  (e.g. `lt/…`). `.gitbook/assets` is shared; slugs are parallel (`/build` ↔ `/lt/build`).
+- *termx*: each language has its own slug (from `pages.json`), so routes differ
+  (`/build` ↔ `/lt/versijos`). mdbook generates **redirect stubs** so the language switcher
+  still lands on the correct translation. Per-locale menu labels/links come from `locales`
+  in the config.
 
 **Card grids.** A bullet list tagged `{.card-grid}` renders as a responsive card grid. Each
 item may carry an image (cover), a heading (title), text (description) and links tagged
@@ -243,10 +279,33 @@ button is always available.
    TermX smart-text is transformed/expanded here.
 3. **Build** — VitePress renders the static site to `.mdbook/dist`.
 
-## Live examples
+## Reference projects
 
-- Portfolio (GitBook source): <https://helex-solutions.github.io/ib-portfolio/>
-- TermX tutorial (TermX source, en/lt): <https://termx-health.github.io/tutorial/>
+Real repositories you can copy from — each links the live site and its `.mdbook/config.yml`:
+
+| Project | Source | Live site | Repo |
+|---|---|---|---|
+| HL7 Lithuania Registry | `termx` (en/lt) | <https://hl7.lt> | [HL7LT/hl7lt-website](https://github.com/HL7LT/hl7lt-website/blob/main/.mdbook/config.yml) |
+| TermX tutorial | `termx` (en/lt) | <https://termx-health.github.io/tutorial/> | [termx-health/tutorial](https://github.com/termx-health/tutorial/blob/main/.mdbook/config.yml) |
+| Portfolio | `gitbook` | <https://helex-solutions.github.io/ib-portfolio/> | [helex-solutions/ib-portfolio](https://github.com/helex-solutions/ib-portfolio/blob/main/.mdbook/config.yml) |
+
+Each config option, and a project that uses it:
+
+| Config | Example project(s) |
+|---|---|
+| `source.format: gitbook` (`SUMMARY.md` + `README.md` + `.gitbook/assets`) | portfolio |
+| `source.format: termx` + `meta` / `pages` (under `source/`) | hl7lt-website, tutorial |
+| `site.url` (sitemap, canonical, Open Graph) | hl7lt-website |
+| `theme.skin` | hl7lt-website (`hl7lt`), tutorial (`helex`), portfolio (`default`) |
+| `search` | all three |
+| `footer` (`message` + `copyright`) | hl7lt-website, tutorial |
+| `nav` | hl7lt-website |
+| `locales` (per-locale menu labels/links) | hl7lt-website |
+| `tx-server` (`{{csc:}}` / `{{vsc:}}` tables, `cs:` / `vs:` links) | tutorial |
+| `{{def:}}` StructureDefinition viewer | tutorial |
+| `{.card-grid}` card grids | hl7lt-website, tutorial |
+| Multilingual + locale-switch redirect stubs (`pages.json`) | hl7lt-website, tutorial |
+| `comments` (Giscus) | see [Comments](#comments-github-discussions) above |
 
 ## License
 

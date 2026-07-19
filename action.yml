@@ -1,5 +1,8 @@
-name: mdbook
-description: Build a searchable, themeable, multilingual site from Markdown + metadata (TermX Wiki / GitBook) using mdbook.
+# `name` is the GitHub Marketplace listing name — must be globally unique
+# (plain "mdbook" collides with the Rust mdBook). `branding` icon must be a
+# Feather icon name; color one of GitHub's allowed values.
+name: HELEX mdbook
+description: Build a searchable, themeable, multilingual site from Markdown + metadata (TermX Wiki / GitBook).
 branding:
   icon: book-open
   color: green
