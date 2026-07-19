@@ -13,6 +13,16 @@
   border-radius: 6px;
 }
 
+/* Avoid a "double separator": an authored `---` (<hr>) immediately before a
+ * section heading would stack with VitePress's own heading top-border, showing
+ * two lines. Drop the heading's border/top-padding in that case so the explicit
+ * `---` is the single divider. */
+.vp-doc hr + h2 {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 24px;
+}
+
 /* GitBook `icon:` frontmatter rendered in the sidebar/menu labels. */
 .mdbook-icon {
   display: inline-flex;
