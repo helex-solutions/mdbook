@@ -21,3 +21,36 @@ test('tableAttrs: a {.dense} not after a table is left to markdown-it-attrs (no 
   assert.doesNotMatch(out, /<table/, 'no table is involved')
   assert.match(out, /Some text/, 'surrounding content is preserved')
 })
+
+test('cardGrid: {.card-grid} list becomes cards with cover, title, description and buttons', () => {
+  const src = [
+    '- ![](/.gitbook/assets/base.png)',
+    '  ### LT Base',
+    '  Core Lithuanian FHIR Implementation Guide.',
+    '  [Latest Build](https://build.fhir.org/ig/HL7LT/ig-lt-base){.button}',
+    '  [History](https://hl7.lt/fhir/base/history.html){.button .secondary}',
+    '{.card-grid}',
+    ''
+  ].join('\n')
+  const out = render(src)
+  assert.match(out, /<div class="mdbook-cards">/, 'wrapper is rendered')
+  assert.match(out, /<div class="mdbook-card">/, 'a card is rendered')
+  assert.match(out, /class="mdbook-card-cover"[^>]*src="\/\.gitbook\/assets\/base\.png"/, 'cover image')
+  assert.match(out, /<div class="mdbook-card-title">LT Base<\/div>/, 'title from heading')
+  assert.match(out, /Core Lithuanian FHIR Implementation Guide\./, 'description text')
+  assert.match(out, /<a href="https:\/\/build\.fhir\.org\/ig\/HL7LT\/ig-lt-base" class="mdbook-card-btn">Latest Build<\/a>/, 'primary button')
+  assert.match(out, /class="mdbook-card-btn secondary"[^>]*>History<\/a>/, 'secondary button')
+  assert.doesNotMatch(out, /<ul/, 'the source list is fully consumed')
+})
+
+test('cardGrid: extra classes (e.g. cards-row) pass through to the wrapper', () => {
+  const src = ['- ### A', '  text', '{.card-grid .cards-row}', ''].join('\n')
+  const out = render(src)
+  assert.match(out, /<div class="mdbook-cards cards-row">/, 'wrapper carries the extra class')
+})
+
+test('cardGrid: a plain list without {.card-grid} is untouched', () => {
+  const out = render('- one\n- two\n')
+  assert.match(out, /<ul>/, 'ordinary list is left alone')
+  assert.doesNotMatch(out, /mdbook-cards/, 'no card grid produced')
+})

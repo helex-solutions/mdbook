@@ -14,6 +14,7 @@ import { termxImages } from './termx-images.mjs'
 import { termxEmbeds } from './termx-embeds.mjs'
 import { collapsible } from './collapsible.mjs'
 import { tabset } from './tabset.mjs'
+import { cardGrid } from './card-grid.mjs'
 import { diagrams } from './diagrams.mjs'
 import { tableAttrs } from './table-attrs.mjs'
 
@@ -40,6 +41,7 @@ export function applyMarkdown(md, opts = {}) {
   md.use(termxEmbeds) // {{def:…}} {{csc:…}} {{vsc:…}} -> Vue-safe inline code
   md.use(collapsible) // +++ Title … +++  ->  <details>
   md.use(tabset) // ## {.tabset} + ### tabs  ->  pure-CSS tabs
+  md.use(cardGrid) // list {.card-grid}  ->  card grid with cover/title/desc/buttons
   md.use(diagrams, opts) // ```drawio ```plantuml ```mermaid
   md.use(termxLinks, opts) // [t](page:slug) [t](cs:code) [t](vs:code) [t](concept:cs|code)
   md.use(termxImages, opts) // ![](files/<pageId>/<file>)
@@ -56,4 +58,4 @@ export function applyMarkdown(md, opts = {}) {
   }
 }
 
-export { termxLinks, termxImages, collapsible }
+export { termxLinks, termxImages, collapsible, cardGrid }

@@ -35,7 +35,7 @@ TermX Wiki → mdbook feature matrix.
    source:
      format: gitbook          # gitbook | termx  (auto-detected if omitted)
    theme:
-     skin: default            # default | ocean | paper | helex | taltech
+     skin: default            # default | ocean | paper | helex | taltech | hl7lt
    search: true
    ```
 
@@ -123,7 +123,7 @@ source:
   format: gitbook              # gitbook | termx  (auto-detected if omitted)
 
 theme:
-  skin: default                # default | ocean | paper | helex | taltech
+  skin: default                # default | ocean | paper | helex | taltech | hl7lt
 
 search: true
 
@@ -138,6 +138,11 @@ comments:
 
 # TermX terminology (optional) — FHIR server for {{csc:}}/{{vsc:}} and cs:/vs: links.
 tx-server: https://your-termx-host/api/fhir
+
+# Footer (optional) — shown on every page. Both fields allow inline HTML/links.
+footer:
+  message: Open source · Collaborative · Interoperable
+  copyright: © 2026 Example Org
 
 # Menu — added on top of the auto-generated nav/sidebar.
 nav:
@@ -159,6 +164,25 @@ build:
 |---|---|---|
 | `gitbook` | `SUMMARY.md` | `README.md` (home) + `SUMMARY.md` (nav) + `.gitbook/assets` |
 | `termx` | `__source/pages.json` or `input/pages.json` | `space.json` + `pages.json` + `input/*.md` (or `input/pagecontent/*.md`) |
+
+**Multilingual (gitbook).** The default language (`site.lang`) lives at the repo root; add a
+locale by creating a `<lang>/` subdirectory with its own `SUMMARY.md` + `README.md` + pages
+(e.g. `lt/SUMMARY.md`, `lt/README.md`, `lt/*.md`). It is served under `/<lang>/` and a
+language switcher appears automatically. `.gitbook/assets` is shared across locales.
+
+**Card grids.** A bullet list tagged `{.card-grid}` renders as a responsive card grid. Each
+item may carry an image (cover), a heading (title), text (description) and links tagged
+`{.button}` (rendered as action buttons; add `.secondary` for an outlined variant). Use
+`{.card-grid .cards-row}` for a horizontal (image-left) layout.
+
+```markdown
+- ![](/.gitbook/assets/base.png)
+  ### LT Base
+  Core Lithuanian FHIR Implementation Guide.
+  [Latest Build](https://build.fhir.org/ig/HL7LT/ig-lt-base){.button}
+  [History](https://hl7.lt/fhir/base/history.html){.button .secondary}
+{.card-grid}
+```
 
 ## Comments (GitHub Discussions)
 

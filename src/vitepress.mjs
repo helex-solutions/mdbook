@@ -19,6 +19,7 @@ function themeConfigFor(bundle, lang) {
     ...(bundle.search ? { search: { provider: 'local' } } : {}),
     ...(bundle.logo ? { logo: bundle.logo } : {}),
     ...(bundle.comments ? { comments: bundle.comments } : {}),
+    ...(bundle.footer ? { footer: bundle.footer } : {}),
     outline: bundle.outline || [2, 3]
   }
 }

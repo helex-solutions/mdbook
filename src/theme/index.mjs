@@ -6,6 +6,7 @@ import { useRoute } from 'vitepress'
 import { h, onMounted, watch, nextTick } from 'vue'
 import Comments from './comments.mjs'
 import Present from './present.mjs'
+import Footer from './footer.mjs'
 import './styles/base.css'
 import './styles/smart-text.css'
 
@@ -60,7 +61,7 @@ export default {
   Layout: () =>
     h(DefaultTheme.Layout, null, {
       'doc-after': () => h(Comments),
-      'layout-bottom': () => h(Present)
+      'layout-bottom': () => [h(Footer), h(Present)]
     }),
   setup() {
     const route = useRoute()

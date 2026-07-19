@@ -77,6 +77,7 @@ function makeBundle(cfg, model) {
     userSidebarExtra: cfg.sidebarExtra,
     search: cfg.search,
     comments: cfg.comments || null,
+    footer: cfg.footer || null,
     web,
     txServer: cfg.txServer,
     spaceCode: model.spaceCode || null,

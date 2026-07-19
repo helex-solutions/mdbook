@@ -46,6 +46,7 @@ Legend: ✅ full parity · 🟡 works with a caveat · 🔴 not supported static
 | Mermaid | ` ```mermaid ` | ✅ | Rendered client-side (mermaid), theme-aware |
 | PlantUML | ` ```plantuml ` | ✅ | Encoded (`plantuml-encoder`) to the PlantUML server — needs internet at view time |
 | GitBook card tables | `<table data-view="cards">` | ✅ | Converted to a card grid (also cover-image and linked-title variants) — for GitBook-sourced spaces |
+| Card grid with buttons | list + `{.card-grid}` | ✅ | Markdown-authored card grid: per-item image (cover), heading (title), text (description) and `{.button}` links (rendered as `a.mdbook-card-btn`; `.secondary` = outlined). `{.card-grid .cards-row}` for a horizontal layout. See `src/markdown/card-grid.mjs` |
 | Include: StructureDefinition | `{{def:code; type=diff\|snap\|hybrid}}` | ✅ | Rendered by the vendored `@termx-health/structure-definition-viewer` from the exported `__source/resources/structure-definition/<code>.json` |
 | Include: CodeSystem concepts | `{{csc:code\|ver; properties=…; langs=…; limit=…}}` | ✅ | Fetched at build time from the FHIR server: `GET {tx-server}/CodeSystem/{code}` → inline `concept[]`. Card fallback if `tx-server` is unset or the fetch fails |
 | Include: ValueSet concepts | `{{vsc:code\|ver; …}}` | ✅ | Fetched at build time: `GET {tx-server}/ValueSet/{code}/$expand?includeDesignations=true` → `expansion.contains[]`. Same fallback |
@@ -75,7 +76,9 @@ which is stricter. mdbook normalizes content at build time so these never break:
 
 - **Multilingual routes.** TermX SSG uses `/en/…`, `/lt/…`. mdbook serves the **default
   language at the root** (`/…`) and other locales under `/<lang>/…` (VitePress i18n).
-  A page appears in a locale only if it is actually translated in that language.
+  A page appears in a locale only if it is actually translated in that language. For
+  **gitbook** sources, additional locales are authored as `<lang>/` subdirectories, each with
+  its own `SUMMARY.md` + `README.md` + pages.
 - **Menu.** Built from `pages.json`; groups are collapsible/collapsed like the SSG. Config
   can add nav/sidebar entries or fully override the sidebar.
 - **Page links.** `page:slug` → the internal page when it exists in this build; otherwise

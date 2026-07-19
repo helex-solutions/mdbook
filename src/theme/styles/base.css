@@ -57,7 +57,8 @@
 .mdbook-present .VPSidebar,
 .mdbook-present .VPDoc .aside,
 .mdbook-present .VPDocFooter,
-.mdbook-present .mdbook-comments {
+.mdbook-present .mdbook-comments,
+.mdbook-present .mdbook-footer {
   display: none !important;
 }
 .mdbook-present .VPContent {
@@ -133,3 +134,27 @@
 .VPNavBarTranslations .vpi-languages {
   --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M2 12h20'/%3E%3Cpath d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z'/%3E%3C/svg%3E");
 }
+
+/* ── Site footer (src/theme/footer.mjs) ────────────────────────────────────
+   An always-visible footer (VitePress's own is hidden when a sidebar shows). */
+.mdbook-footer {
+  border-top: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-alt);
+  padding: 20px 24px;
+  text-align: center;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--vp-c-text-2);
+}
+.mdbook-footer-inner {
+  max-width: 1152px;
+  margin: 0 auto;
+}
+.mdbook-footer p { margin: 0; }
+.mdbook-footer-copyright { color: var(--vp-c-text-3); }
+.mdbook-footer a {
+  color: var(--vp-c-brand-1);
+  text-decoration: none;
+  font-weight: 500;
+}
+.mdbook-footer a:hover { text-decoration: underline; }

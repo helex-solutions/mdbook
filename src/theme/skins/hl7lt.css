@@ -1,0 +1,52 @@
+/* Skin: hl7lt — HL7 Lithuania Registry brand.
+ * Teal primary (links/buttons), Lithuanian green for headings, yellow accent —
+ * mirroring hl7.lt (#117880 teal, #215d42 green, #FDB913 yellow). */
+:root {
+  --vp-c-brand-1: #117880; /* teal — links, buttons, active nav */
+  --vp-c-brand-2: #19929c; /* lighter teal — hover */
+  --vp-c-brand-3: #1fa7b2; /* brighter teal — accents */
+  --vp-c-brand-soft: rgba(17, 120, 128, 0.14);
+
+  /* Lithuanian green for headings/branding. */
+  --hl7lt-green: #215d42;
+  /* Lithuanian yellow accent. */
+  --hl7lt-yellow: #fdb913;
+}
+
+.dark {
+  --vp-c-brand-1: #35b3bd;
+  --vp-c-brand-2: #4cc4ce;
+  --vp-c-brand-3: #64d2db;
+  --vp-c-brand-soft: rgba(53, 179, 189, 0.16);
+  --hl7lt-green: #57b389;
+}
+
+/* Card titles and page headings pick up the Lithuanian green. */
+.vp-doc .mdbook-card-title,
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3 {
+  color: var(--hl7lt-green);
+}
+
+/* Yellow hover on card buttons, matching the source site. */
+.vp-doc a.mdbook-card-btn:hover {
+  background: var(--hl7lt-yellow);
+  border-color: var(--hl7lt-yellow);
+  color: #1a1a1a;
+}
+.vp-doc a.mdbook-card-btn.secondary:hover {
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+}
+
+/* Home hero image (the Lithuanian ribbon), floated right like the source site. */
+.vp-doc .hl7lt-hero-img {
+  float: right;
+  width: 300px;
+  max-width: 40%;
+  margin: 0 0 1rem 1.5rem;
+}
+@media (max-width: 640px) {
+  .vp-doc .hl7lt-hero-img { float: none; display: block; margin: 0 auto 1rem; max-width: 80%; }
+}

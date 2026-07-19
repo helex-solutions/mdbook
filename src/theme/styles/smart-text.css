@@ -284,3 +284,70 @@
 }
 /* First field after the title reads as an italic subtitle (role/subtitle). */
 .vp-doc .mdbook-card-field:first-of-type em { font-style: italic; }
+
+/* Action buttons inside a card (from `{.card-grid}` links tagged `.button`).
+ * Pinned to the bottom so cards of unequal text length line their buttons up. */
+.vp-doc .mdbook-card-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.vp-doc a.mdbook-card-btn {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.85em;
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+  border: 1px solid var(--vp-c-brand-1);
+  background: var(--vp-c-brand-1);
+  color: var(--vp-c-white, #fff);
+  transition: background-color 0.2s, border-color 0.2s, transform 0.2s, color 0.2s;
+}
+.vp-doc a.mdbook-card-btn:hover {
+  background: var(--vp-c-brand-2);
+  border-color: var(--vp-c-brand-2);
+  transform: translateY(-1px);
+}
+/* Secondary = outlined. */
+.vp-doc a.mdbook-card-btn.secondary {
+  background: transparent;
+  color: var(--vp-c-brand-1);
+}
+.vp-doc a.mdbook-card-btn.secondary:hover {
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+}
+.vp-doc a.mdbook-card-btn.disabled {
+  pointer-events: none;
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
+/* Horizontal variant: `{.card-grid .cards-row}` — a single stacked column of
+ * wide cards with the cover image on the left (matches the Terminology page). */
+.vp-doc .mdbook-cards.cards-row {
+  grid-template-columns: 1fr;
+  max-width: 900px;
+}
+.vp-doc .mdbook-cards.cards-row .mdbook-card {
+  flex-direction: row;
+  align-items: center;
+}
+.vp-doc .mdbook-cards.cards-row .mdbook-card-cover {
+  width: 96px;
+  min-width: 96px;
+  height: 96px;
+  aspect-ratio: auto;
+  object-fit: contain;
+  padding: 12px;
+  align-self: center;
+}
+.vp-doc .mdbook-cards.cards-row .mdbook-card-body { flex: 1; }
+@media (max-width: 560px) {
+  .vp-doc .mdbook-cards.cards-row .mdbook-card { flex-direction: column; align-items: stretch; }
+  .vp-doc .mdbook-cards.cards-row .mdbook-card-cover { width: 100%; height: 120px; }
+}
