@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pc from 'picocolors'
-import { loadConfig } from './config.mjs'
+import { loadConfig, applySpaceConfig } from './config.mjs'
 import { ingestGitbook } from './ingest/gitbook.mjs'
 import { ingestTermx } from './ingest/termx.mjs'
 import { copyDir } from './ingest/util.mjs'
@@ -218,12 +218,9 @@ async function prepare(projectRoot, overrides = {}) {
   log(`project ${pc.dim(cfg.projectRoot)}`)
   log(`format ${pc.bold(cfg.source.format)}  skin ${pc.bold(cfg.theme.skin)}  base ${pc.bold(cfg.site.base)}`)
   const model = ingest(cfg)
-  // Space-level metadata from the export fills config that wasn't set explicitly
-  // (config still wins; CI/CNAME URL detection still wins over the space's siteUrl).
-  if (!cfg.site.description && model.description) cfg.site.description = model.description
-  if (!cfg.site.url && model.siteUrl) {
-    cfg.site.url = model.siteUrl.endsWith('/') ? model.siteUrl : model.siteUrl + '/'
-  }
+  // Space-level metadata + generator config from the export fill config that wasn't set explicitly
+  // (config.yml still wins; CI/CNAME URL detection still wins over the space's siteUrl).
+  applySpaceConfig(cfg, model)
   log(
     `ingested ${pc.bold(model.contentFiles.length)} pages, langs [${model.langs.join(', ')}]`
   )

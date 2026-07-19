@@ -30,7 +30,8 @@ test('termx ingest: reads space defaultLang/langs/description/siteUrl + page des
     description: { en: 'English summary', lt: 'Lietuviška santrauka' },
     defaultLang: 'lt',
     langs: ['lt', 'en'],
-    siteUrl: 'https://custom.example.org'
+    siteUrl: 'https://custom.example.org',
+    ssg: { theme: { skin: 'helex' }, footer: { message: 'Guide' }, txServer: 'https://dev.termx.org/api/fhir' }
   }
   const pages = [
     {
@@ -50,6 +51,8 @@ test('termx ingest: reads space defaultLang/langs/description/siteUrl + page des
   assert.deepEqual(model.langs, ['lt', 'en'], 'exported langs order preserved')
   assert.equal(model.description, 'Lietuviška santrauka', 'space description for the default language')
   assert.equal(model.siteUrl, 'https://custom.example.org')
+  assert.equal(model.ssg?.theme?.skin, 'helex', 'space ssg config passed through')
+  assert.equal(model.ssg?.txServer, 'https://dev.termx.org/api/fhir')
 
   const en = model.contentFiles.find((f) => f.lang === 'en' && f.dest.endsWith('home.md'))
   assert.ok(en, 'english home page present')
@@ -67,6 +70,7 @@ test('termx ingest: falls back cleanly when the new fields are absent', () => {
   assert.deepEqual(model.langs, ['en'])
   assert.equal(model.description, '', 'no space description -> empty')
   assert.equal(model.siteUrl, null, 'no siteUrl -> null (CI/config still apply upstream)')
+  assert.equal(model.ssg, null, 'no ssg block -> null')
   const home = model.contentFiles.find((f) => f.dest.endsWith('home.md'))
   assert.equal(home.description, null)
   assert.equal(home.tags, null)

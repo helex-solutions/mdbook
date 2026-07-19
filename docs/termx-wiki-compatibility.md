@@ -113,6 +113,26 @@ tx-server: https://your-termx-host/api/fhir   # FHIR API base (…/fhir)
      so links follow the configured server),
   3. else the space's `web` (from `space.json`).
 
+### Generator config from the wiki (`space.json` → `ssg`)
+
+The TermX Wiki space carries the generator settings you'd otherwise hand-write in
+`.mdbook/config.yml`, exported under an `ssg` block in `space.json`:
+
+```json
+"ssg": {
+  "theme":  { "skin": "helex", "accent": "#2f6feb", "switcher": true },
+  "footer": { "message": "…", "copyright": "…" },
+  "txServer": "https://your-termx-host/api/fhir",
+  "search": true,
+  "logo": "files/1/logo.png"
+}
+```
+
+These become the **base** config (`theme.skin`/`accent`/`switcher`, `footer`, `tx-server`,
+`search`, `site.logo`). A repo's own `.mdbook/config.yml` still wins — it only fills what the
+config didn't set explicitly — so you can configure everything in the wiki and keep `config.yml`
+optional, or override individual fields per repo. Applied by `applySpaceConfig` in `src/config.mjs`.
+
   Set `site.web` to point links somewhere other than `tx-server`.
 
 ## 7. Remaining gaps to close for full parity
@@ -137,6 +157,9 @@ and which are handled here) is specified in the wiki repo's `docs/wiki-mdbook-sy
   title/description and space-level description/languages/URL are read from the export
   (`space.json` / `pages.json`) with inference as the fallback; page tags become
   `<meta name="keywords">`
+- **Generator config from the space:** `src/config.mjs` (`applySpaceConfig`) merges the
+  `space.json` `ssg` block (theme/footer/tx-server/search/logo) as config defaults, with a
+  repo's `.mdbook/config.yml` still winning
 - **Ingestion adapters:** `src/ingest/` — `termx.mjs`, `gitbook.mjs`
 - **Client runtime + styles:** `src/theme/` — mermaid + `<tx-sd-view>` registration +
   current-link marking, `styles/smart-text.css`, `skins/`

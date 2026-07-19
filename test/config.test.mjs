@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { resolveBase, resolveSiteUrl } from '../src/config.mjs'
+import { resolveBase, resolveSiteUrl, applySpaceConfig } from '../src/config.mjs'
 
 const ENV_KEYS = ['GITHUB_ACTIONS', 'GITHUB_REPOSITORY', 'MDBOOK_BASE']
 const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]))
@@ -69,4 +69,70 @@ test('resolveSiteUrl: CNAME domain at root', () => {
 test('resolveSiteUrl: null when local/unknown', () => {
   for (const k of ENV_KEYS) delete process.env[k]
   assert.equal(resolveSiteUrl({ projectRoot: tmpProject(), base: '/' }), null)
+})
+
+// A minimal cfg shaped like loadConfig's output, for the space-config merge.
+function cfgLike({ raw = {}, theme = {}, footer = null, txServer = null, site = {} } = {}) {
+  return {
+    raw,
+    site: { description: '', url: null, logo: null, ...site },
+    theme: { skin: 'default', accent: null, switcher: false, ...theme },
+    footer,
+    txServer,
+    search: true
+  }
+}
+
+test('applySpaceConfig: space ssg fills config that was not set explicitly', () => {
+  const cfg = cfgLike()
+  applySpaceConfig(cfg, {
+    description: 'From the wiki',
+    siteUrl: 'https://tutorial.example.org',
+    ssg: {
+      theme: { skin: 'helex', accent: '#0aa', switcher: true },
+      footer: { message: 'Guide', copyright: '(c) 2026' },
+      txServer: 'https://dev.termx.org/api/fhir',
+      search: false,
+      logo: 'files/1/logo.png'
+    }
+  })
+  assert.equal(cfg.theme.skin, 'helex')
+  assert.equal(cfg.theme.accent, '#0aa')
+  assert.equal(cfg.theme.switcher, true)
+  assert.deepEqual(cfg.footer, { message: 'Guide', copyright: '(c) 2026' })
+  assert.equal(cfg.txServer, 'https://dev.termx.org/api/fhir')
+  assert.equal(cfg.search, false)
+  assert.equal(cfg.site.logo, 'files/1/logo.png')
+  assert.equal(cfg.site.description, 'From the wiki')
+  assert.equal(cfg.site.url, 'https://tutorial.example.org/')
+})
+
+test('applySpaceConfig: an explicit config.yml value wins over the space', () => {
+  const cfg = cfgLike({
+    raw: { theme: { skin: 'custom', switcher: false }, search: true, 'tx-server': 'https://cfg/fhir' },
+    theme: { skin: 'custom', switcher: false },
+    footer: { message: 'Config footer' },
+    txServer: 'https://cfg/fhir'
+  })
+  applySpaceConfig(cfg, {
+    ssg: {
+      theme: { skin: 'helex', switcher: true },
+      footer: { message: 'Wiki footer' },
+      txServer: 'https://wiki/fhir',
+      search: false
+    }
+  })
+  assert.equal(cfg.theme.skin, 'custom', 'explicit skin kept')
+  assert.equal(cfg.theme.switcher, false, 'explicit switcher kept')
+  assert.equal(cfg.txServer, 'https://cfg/fhir', 'explicit tx-server kept')
+  assert.equal(cfg.search, true, 'explicit search kept')
+  assert.deepEqual(cfg.footer, { message: 'Config footer' }, 'existing footer kept')
+})
+
+test('applySpaceConfig: no-op when the space has no ssg block', () => {
+  const cfg = cfgLike()
+  applySpaceConfig(cfg, { ssg: null })
+  assert.equal(cfg.theme.skin, 'default')
+  assert.equal(cfg.footer, null)
+  assert.equal(cfg.txServer, null)
 })

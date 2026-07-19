@@ -37,6 +37,8 @@ export function loadConfig(projectRoot, overrides = {}) {
     projectRoot,
     mdbookDir,
     configFile: file,
+    raw: data, // the parsed config.yml, used to tell an explicit setting from an applied default
+
     site: {
       title: data.site?.title || null, // resolved later from space.json / dir name
       description: data.site?.description || '',
@@ -76,6 +78,26 @@ export function loadConfig(projectRoot, overrides = {}) {
       cleanUrls: data.build?.cleanUrls ?? true
     }
   }
+  return cfg
+}
+
+// Merge the space.json export metadata into cfg as defaults. A repo's own config.yml always wins:
+// fields with a non-null default (skin/switcher/search) are only taken from the space when the raw
+// parsed config didn't set them; CI/CNAME URL detection still wins over the space's siteUrl upstream.
+export function applySpaceConfig(cfg, model) {
+  if (!cfg.site.description && model.description) cfg.site.description = model.description
+  if (!cfg.site.url && model.siteUrl) {
+    cfg.site.url = model.siteUrl.endsWith('/') ? model.siteUrl : model.siteUrl + '/'
+  }
+  const raw = cfg.raw || {}
+  const ssg = model.ssg || {}
+  if (ssg.theme?.skin && raw.theme?.skin == null) cfg.theme.skin = ssg.theme.skin
+  if (ssg.theme?.accent && raw.theme?.accent == null) cfg.theme.accent = ssg.theme.accent
+  if (ssg.theme?.switcher != null && raw.theme?.switcher == null) cfg.theme.switcher = ssg.theme.switcher
+  if (ssg.txServer && raw.txServer == null && raw['tx-server'] == null) cfg.txServer = ssg.txServer
+  if (ssg.footer && !cfg.footer) cfg.footer = ssg.footer
+  if (ssg.search != null && raw.search == null) cfg.search = ssg.search
+  if (ssg.logo && !cfg.site.logo) cfg.site.logo = ssg.logo
   return cfg
 }
 

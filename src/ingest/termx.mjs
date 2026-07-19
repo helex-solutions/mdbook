@@ -177,6 +177,7 @@ export function ingestTermx(cfg) {
     spaceCode: space.code || null,
     description: spaceDescription,
     siteUrl: space.siteUrl || null,
+    ssg: space.ssg || null, // generator config (theme/footer/txServer/search/logo) from the wiki
     langs: activeLangs,
     defaultLang,
     home: home[defaultLang] || null,
