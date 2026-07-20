@@ -506,3 +506,41 @@ a.mdbook-crumb:hover {
 @media print {
   .mdbook-op > *:not(summary) { display: block !important; }
 }
+
+/* Operation filter (src/theme/openapi.mjs). Sticks below the nav so it stays
+   reachable while scrolling a page of hundreds of operations. */
+.mdbook-op-filter {
+  position: sticky;
+  top: var(--vp-nav-height, 64px);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 20px;
+  padding: 8px 0;
+  background: var(--vp-c-bg);
+}
+.mdbook-op-filter-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 12px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+}
+.mdbook-op-filter-input:focus {
+  outline: none;
+  border-color: var(--vp-c-brand-1);
+}
+.mdbook-op-filter-count {
+  flex: none;
+  font-size: 12px;
+  color: var(--vp-c-text-3);
+  font-variant-numeric: tabular-nums;
+}
+/* Filtering hides elements outright; keep that authoritative over .vp-doc rules
+   that set display on headings. */
+.vp-doc [hidden] { display: none !important; }
+.mdbook-present .mdbook-op-filter { display: none !important; }

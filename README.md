@@ -153,6 +153,7 @@ source:
 openapi:
   specs:                       # name -> local file or URL; pages cite the name
     petstore: ./api/petstore.yaml
+  sort: path                   # source (default) | path | summary
   tryIt: true                  # interactive console (default: true)
   auth:                        # only what an OpenAPI document cannot declare
     clientId: docs-portal
@@ -371,6 +372,28 @@ Override per block with `collapsed="false"`:
 ```
 {% openapi src="petstore" operation="listPets" collapsed="false" %}
 ```
+
+### Order and filtering
+
+Operations render in the document's own order by default — for a generated document that is
+whatever order the framework happened to emit, which is rarely useful to a reader. Sort them
+instead:
+
+```yaml
+openapi:
+  sort: path         # source (default) | path | summary
+```
+
+`path` groups an endpoint's methods together and orders the groups alphabetically, with the
+methods themselves in REST order (GET, POST, PUT, PATCH, DELETE…) rather than alphabetically,
+so reading a path top to bottom follows the lifecycle. `summary` sorts by the operation's
+description. Override per block with `sort="path"`.
+
+A page carrying eight or more operations also gets a **filter box** under its title. Typing
+narrows the list live — matching method, path and summary, with multiple words all having to
+match — and hides any section heading left with nothing under it. It is progressive
+enhancement: without JavaScript the full list is still there, and site search still finds
+every operation, because the filter only hides what is already rendered.
 
 ### Base URL
 

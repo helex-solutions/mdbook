@@ -159,6 +159,9 @@ function normalizeOpenapi(data, projectRoot) {
     // calls the docs' own origin, so the browser never makes a cross-origin
     // request and the API needs no CORS headers. Applies to `dev` only.
     proxy: data.proxy || null,
+    // 'path' (default) sorts operations by path then method; 'none' keeps the
+    // document's own order.
+    sort: data.sort || 'path',
     tryIt: data.tryIt ?? data['try-it'] ?? true,
     // Operations render collapsed by default: a document with hundreds of
     // operations is unreadable fully expanded. The detail stays in the HTML, so
