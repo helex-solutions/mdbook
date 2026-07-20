@@ -30,6 +30,25 @@ export function applyMarkdown(md, opts = {}) {
     for (const t of state.tokens) if (t.meta == null) t.meta = {}
     return false
   })
+  // Prose written for other renderers often ends a line or heading with a bare
+  // `{word}` — an API path like `GET /x/{id}`, a template placeholder like
+  // `{recordingId}`, etc. markdown-it-attrs turns those into empty-valued HTML
+  // attributes (`{id}` -> id=""), and duplicate empty `id`s crash VitePress's
+  // anchor uniqueness check. Real mdbook attrs (`{.foo}`, `{#bar}`, `{k=v}`)
+  // always carry a non-empty value, so dropping empty-valued attributes right
+  // after curly_attributes removes the accidental ones and keeps the intended.
+  md.core.ruler.after('curly_attributes', 'mdbook_drop_empty_attrs', (state) => {
+    // `alt` is legitimately empty on `![](x)` images and is required by the
+    // image renderer, so it is never dropped; every other empty-valued attribute
+    // is an accidental `{word}` artifact.
+    const clean = (tok) => {
+      if (tok.attrs) tok.attrs = tok.attrs.filter(([k, v]) => v !== '' || k === 'alt')
+      if (tok.children) for (const c of tok.children) clean(c)
+    }
+    for (const t of state.tokens) clean(t)
+    return false
+  })
+
   md.use(tableAttrs) // attach an orphaned `{.dense}`/`{…}` after a multimd table to the table
   md.use(mark) // ==highlight==
   md.use(sub) // H~2~O

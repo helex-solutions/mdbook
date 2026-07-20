@@ -29,7 +29,8 @@ Real sites built with mdbook — click a thumbnail for the live site (see
 
 - 🔎 **Search** — built-in local full-text search (no external service)
 - 🎨 **Skins** — swappable themes (`default`, `ocean`, `paper`, plus brand skins `helex`, `taltech`)
-- 🧭 **Menu** — nav & sidebar auto-generated from your content; extendable or overridable in config
+- 🧭 **Menu** — nav & sidebar auto-generated from your content; extendable or overridable in config. On a plain folder tree each top-level section gets its own sidebar, folders sort before files, and a page can set `sidebarTitle` to keep its menu label short
+- 🧵 **Orientation at scale** — breadcrumbs above every page, and a **Related** block cross-linking the same document id across parallel trees (a spec ↔ its validation ↔ the story it traces from)
 - 🌍 **Multilingual** — first-class locales (default language at `/`, others under `/<lang>/`)
 - 🧩 **TermX smart-text** — callouts, tabsets, links-list/grid-list, `+++` collapsibles, `page:`/`cs:`/`vs:`/`concept:` links, `files/` images, page icons, GitBook card tables
 - 📊 **Diagrams** — drawio, Mermaid, PlantUML
@@ -37,6 +38,7 @@ Real sites built with mdbook — click a thumbnail for the live site (see
 - 🏷️ **SEO** — per-page titles/descriptions, `sitemap.xml`, canonical + Open Graph/Twitter tags, JSON-LD and `robots.txt`. Descriptions, languages and site URL are read from the TermX export when authored (site URL also auto-detected in CI), with first-paragraph/CI inference as the fallback; page **tags** are emitted as `<meta name="keywords">`
 - 💬 **Comments** — optional [Giscus](https://giscus.app) (GitHub Discussions) box per page (see [Comments](#comments-github-discussions))
 - 🖥️ **Presentation mode** — a fullscreen, chrome-free view with prev/next controls for showing pages to an audience (see [Presentation mode](#presentation-mode))
+- 🔍 **Zoom** — a −/+ control in the nav bar scales the article (80–200%, remembered per browser); pair it with `theme.wide` for dense reference tables
 
 See [`docs/termx-wiki-compatibility.md`](docs/termx-wiki-compatibility.md) for the full
 TermX Wiki → mdbook feature matrix.
@@ -139,11 +141,24 @@ site:
 
 source:
   format: gitbook              # gitbook | termx  (auto-detected if omitted)
+  exclude:                     # hide files/folders from BOTH the pages and the menu
+    - CLAUDE.md                #   bare name -> matches at any depth
+    - _templates               #   folder name -> the whole subtree
+    - agents/notes             #   path -> matches from the content root
+    - "*.draft.md"             #   `*` within a segment, `**` across segments
 
 theme:
   skin: default                # default | ocean | paper | helex | taltech | hl7lt
+  wide: false                  # true = full-width layout (sidebar hard left, aside
+                               # hard right) for wide tables / reference docs
 
-search: true
+# `search: true|false`, or an object to keep specific pages out of the index
+# (they stay published — one huge generated page can otherwise dominate it).
+search:
+  enabled: true
+  exclude:
+    - glossary.md
+    - CHANGELOG.md
 
 # Comments (optional) — Giscus / GitHub Discussions, mounted after each page.
 comments:
@@ -193,6 +208,34 @@ build:
 |---|---|---|
 | `gitbook` | `SUMMARY.md` | `README.md` (home) + `SUMMARY.md` (nav) + `.gitbook/assets` |
 | `termx` | `pages.json` (in `__source/`, `input/`, or `source/`) | `space.json` + `pages.json` + page markdown (+ `attachments/`) |
+
+**Plain doc trees (no `SUMMARY.md`).** With the `gitbook` format, `SUMMARY.md` is optional:
+point mdbook at any folder of markdown and it builds a **per-section sidebar automatically**
+from the directory tree (each top-level folder gets its own sidebar so pages stay small on
+large repos). Folder labels come from a `README.md` H1 (else the folder name); page labels
+from each file's first H1; entries sort naturally (`01-…` before `10-…`). Add a `SUMMARY.md`
+later to take manual control of the nav. Arbitrary markdown is also **hardened** for the Vue
+compiler — a stray `<Placeholder>`/`</tag>` or `{{ … }}` in prose (common in API specs) is
+escaped instead of crashing the build; real HTML, autolinks and code are left intact.
+
+A menu label defaults to the page's first H1 (a folder's, to its `README.md` H1). When that
+heading is long or cryptic, set a short label without touching the heading:
+
+```yaml
+---
+sidebarTitle: ACC.11 Posting
+---
+
+# ACC.11 — Posting Rules (Common Spec, Consolidated)
+```
+
+**Breadcrumbs and related pages.** Every page gets a breadcrumb trail, and pages whose
+filenames start with the same document id in *different* top-level sections are cross-linked
+under a **Related** block — so `specifications/acc/ACC.11-…` and
+`validations/specifications/acc/ACC.11-…-validation` point at each other. Ids listed in
+`traces-from:` / `traces-to:` frontmatter are linked too. Recognised id forms are dotted
+(`ACC.11`, `ACC.11.3`) and dashed (`ACC-US-010`, `FLOW-BP-003`); pages without one simply get
+no Related block.
 
 **TermX layout.** A TermX Wiki export — or a hand-authored equivalent — is `space.json`
 (space metadata), `pages.json` (the page tree) and one markdown file per page. The metadata

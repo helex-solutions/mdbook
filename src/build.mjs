@@ -7,8 +7,9 @@ import pc from 'picocolors'
 import { loadConfig, applySpaceConfig } from './config.mjs'
 import { ingestGitbook } from './ingest/gitbook.mjs'
 import { ingestTermx } from './ingest/termx.mjs'
-import { copyDir } from './ingest/util.mjs'
-import { sanitizeTermxMarkdown } from './ingest/sanitize.mjs'
+import { copyDir, makeExcluder } from './ingest/util.mjs'
+import { sanitizeTermxMarkdown, hardenMarkdown } from './ingest/sanitize.mjs'
+import { buildDocIndex, relatedFor } from './ingest/related.mjs'
 import { fixStagedImages } from './ingest/images.mjs'
 import { transformGitbookCards } from './ingest/cards.mjs'
 import { transformFileEmbeds } from './ingest/file-embed.mjs'
@@ -79,6 +80,7 @@ function makeBundle(cfg, model) {
     search: cfg.search,
     comments: cfg.comments || null,
     footer: cfg.footer || null,
+    wide: cfg.theme.wide ?? false, // full-width layout (wide tables / reference docs)
     web,
     txServer: cfg.txServer,
     spaceCode: model.spaceCode || null,
@@ -90,6 +92,24 @@ function makeBundle(cfg, model) {
     assetBase: '/attachments',
     breaks: cfg.source.format === 'termx' // TermX Wiki uses breaks:true
   }
+}
+
+// Ancestor trail for a staged page: [{ text, link? }] from the site root down to
+// (but not including) the page itself. A folder with no index page contributes a
+// label without a link, so a crumb never points at a 404.
+function breadcrumbsFor(dest, folderLabels, destSet, base = '/') {
+  const dir = dest.split('/').slice(0, -1)
+  if (!dir.length) return [] // root-level page: nothing to trace
+  const prettify = (n) => n.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  const crumbs = [{ text: 'Home', link: base }]
+  let acc = ''
+  for (const seg of dir) {
+    acc = acc ? `${acc}/${seg}` : seg
+    const crumb = { text: folderLabels?.[acc] || prettify(seg) }
+    if (destSet.has(`${acc}/index.md`)) crumb.link = `${base}${acc}/`.replace(/\/{2,}/g, '/')
+    crumbs.push(crumb)
+  }
+  return crumbs
 }
 
 function stageContent(cfg, model) {
@@ -109,6 +129,11 @@ function stageContent(cfg, model) {
 
   // Copy content files, running markdown through the transform pipeline.
   const isTermx = cfg.source.format === 'termx'
+  const isSearchExcluded = makeExcluder(cfg.searchExclude || [])
+  const docIndex = buildDocIndex(model.contentFiles)
+  // Which staged folders actually have an index page — a breadcrumb for a folder
+  // without one is shown as plain text rather than a link to a 404.
+  const destSet = new Set(model.contentFiles.map((f) => f.dest))
   const sdDirs = [
     path.join(cfg.projectRoot, cfg.source.meta || '__source', 'resources', 'structure-definition'),
     path.join(cfg.projectRoot, 'input', 'resources', 'structure-definition')
@@ -131,6 +156,8 @@ function stageContent(cfg, model) {
         text = sanitizeTermxMarkdown(text)
         text = expandStructureDefinitions(text, sdDirs) // {{def:…}} -> <tx-sd-view>
       }
+      // Harden against VitePress's Vue compiler (stray `<Tag>` / `{{…}}` in prose).
+      text = hardenMarkdown(text)
       text = transformGitbookCards(text) // GitBook card tables -> card grid
       text = transformFileEmbeds(text, cfg.site.base) // {% file %} -> PDF/download card
       // Per-page <title>/<meta description>/<meta keywords>: authored description
@@ -139,6 +166,14 @@ function stageContent(cfg, model) {
       const extra = {}
       if (f.code) extra.termxPage = f.code
       if (f.tags?.length) extra.keywords = f.tags
+      // Keep hand-picked pages out of the search index (they stay published).
+      if (isSearchExcluded(f.dest)) extra.search = false
+      // Where am I / what else covers this — resolved at build time so the theme
+      // only has to render, and pages carry no extra client-side lookup cost.
+      const crumbs = breadcrumbsFor(f.dest, model.folderLabels, destSet, cfg.site.base)
+      if (crumbs.length) extra.breadcrumbs = crumbs
+      const related = relatedFor(f, docIndex, text, model.folderLabels || {})
+      if (related.length) extra.related = related
       text = applySeoFrontmatter(text, {
         title: f.title,
         description: f.description?.trim() || deriveDescription(text),
@@ -246,7 +281,9 @@ export async function buildSite(projectRoot, overrides = {}) {
 export async function devSite(projectRoot, overrides = {}) {
   const { staging } = await prepare(projectRoot, overrides)
   const { createServer } = await import('vitepress')
-  const server = await createServer(staging, { port: overrides.port || 5173 })
+  const serverOpts = { port: overrides.port || 5173 }
+  if (overrides.host !== undefined) serverOpts.host = overrides.host // expose on the LAN
+  const server = await createServer(staging, serverOpts)
   await server.listen()
   server.printUrls()
   return server

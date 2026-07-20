@@ -3,8 +3,16 @@
 import { applyMarkdown } from './markdown/index.mjs'
 
 // Merge the auto-generated sidebar with user overrides/extensions from .mdbook.
+// `generated` is a sidebar array (from SUMMARY.md) or a multi-sidebar object
+// (auto-derived from the folder tree, keyed by section path).
 function resolveSidebar(generated, userSidebar, userExtra) {
   if (userSidebar) return userSidebar // full override
+  if (generated && !Array.isArray(generated)) {
+    if (!userExtra?.length) return generated
+    const out = {}
+    for (const [k, v] of Object.entries(generated)) out[k] = [...v, ...userExtra]
+    return out
+  }
   return [...(generated || []), ...(userExtra || [])]
 }
 
@@ -158,6 +166,12 @@ export function createMdbookConfig(bundle) {
     lastUpdated: true,
     // SEO: sitemap.xml (when the canonical URL is known) + per-page OG tags.
     ...(bundle.siteUrl ? { sitemap: { hostname: bundle.siteUrl } } : {}),
+    // Wide layout is a class on <html> rather than a body class so the stylesheet
+    // can widen the fixed nav/sidebar too. Set from <head>, before first paint,
+    // so a wide page never flashes at the default (narrow) measure.
+    ...(bundle.wide
+      ? { head: [['script', {}, "document.documentElement.classList.add('mdbook-wide')"]] }
+      : {}),
     transformHead: seoHead(bundle),
     markdown,
     // <tx-sd-view> is the vendored StructureDefinition viewer web component.

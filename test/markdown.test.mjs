@@ -43,6 +43,27 @@ test('cardGrid: {.card-grid} list becomes cards with cover, title, description a
   assert.doesNotMatch(out, /<ul/, 'the source list is fully consumed')
 })
 
+test('attrs: a trailing {word} in prose does not become an empty HTML attribute', () => {
+  // Docs written for other renderers end headings/lines with API params like
+  // `{id}` — markdown-it-attrs would turn those into empty attributes, and a
+  // duplicate empty `id` crashes VitePress. They must be dropped.
+  const out = render('# GET /api/x/{id}\n\n## GET /api/y/{id}\n\ntext ending {recordingId}\n')
+  assert.doesNotMatch(out, /id=""/, 'no empty id attribute is emitted')
+  assert.doesNotMatch(out, /recordingId/, 'a bare placeholder word is not turned into an attribute')
+})
+
+test('attrs: real {.class}/{#id}/{k=v} attributes still apply', () => {
+  const out = render('# Heading {.foo #bar}\n\ntext {width=800}\n')
+  assert.match(out, /<h1[^>]*class="foo"/, 'class applies')
+  assert.match(out, /<h1[^>]*id="bar"/, 'non-empty id applies')
+  assert.match(out, /width="800"/, 'key=value applies')
+})
+
+test('attrs: an image keeps its (legitimately empty) alt attribute', () => {
+  const out = render('![](/x.png)\n')
+  assert.match(out, /<img[^>]*alt=""/, 'empty alt is preserved for images')
+})
+
 test('cardGrid: extra classes (e.g. cards-row) pass through to the wrapper', () => {
   const src = ['- ### A', '  text', '{.card-grid .cards-row}', ''].join('\n')
   const out = render(src)

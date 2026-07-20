@@ -68,6 +68,8 @@
 .mdbook-present .VPDoc .aside,
 .mdbook-present .VPDocFooter,
 .mdbook-present .mdbook-comments,
+.mdbook-present .mdbook-breadcrumbs,
+.mdbook-present .mdbook-related,
 .mdbook-present .mdbook-footer {
   display: none !important;
 }
@@ -168,3 +170,180 @@
   font-weight: 500;
 }
 .mdbook-footer a:hover { text-decoration: underline; }
+
+/* Breadcrumbs — the trail above the article (see src/theme/breadcrumbs.mjs).
+   Each top-level section has its own sidebar, so this is the only place a page
+   states where it sits in the whole tree. */
+.mdbook-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--vp-c-text-3);
+}
+.mdbook-crumb {
+  color: var(--vp-c-text-2);
+  text-decoration: none;
+}
+a.mdbook-crumb:hover {
+  color: var(--vp-c-brand-1);
+  text-decoration: underline;
+}
+.mdbook-crumb.is-plain {
+  color: var(--vp-c-text-3);
+}
+.mdbook-crumb-sep {
+  color: var(--vp-c-divider);
+}
+
+/* Related pages — cross-links to the same subject in other sections
+   (see src/theme/related.mjs). */
+.mdbook-related {
+  margin-top: 40px;
+  padding: 16px 20px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+}
+.mdbook-related-title {
+  margin: 0 0 10px;
+  padding: 0;
+  border: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--vp-c-text-2);
+}
+.mdbook-related-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mdbook-related-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+}
+.mdbook-related-item a {
+  font-weight: 500;
+}
+.mdbook-related-section {
+  font-size: 12px;
+  color: var(--vp-c-text-3);
+}
+
+/* ── Wide layout (theme.wide: true) ────────────────────────────────────────
+   Reference documentation — spec tables, API surfaces, traceability matrices —
+   is wider than prose. The default measure (~60rem, centred) squeezes those
+   tables into a narrow column while the viewport sits mostly empty, and on very
+   wide screens the article can slide under the on-this-page aside.
+
+   Wide mode pins the sidebar to the left edge and the aside to the right, and
+   lets the article take everything in between. The class is set on <html> from
+   <head> (see src/vitepress.mjs) so there is no flash of the narrow layout. */
+.mdbook-wide {
+  --vp-layout-max-width: 100%;
+  --mdbook-content-max: none;
+}
+.mdbook-wide .VPDoc .container,
+.mdbook-wide .VPDoc.has-aside .content-container,
+.mdbook-wide .VPDoc:not(.has-aside) .content-container {
+  max-width: none;
+}
+/* Nav bar spans the full width too, so search stays above the article. */
+.mdbook-wide .VPNavBar .container,
+.mdbook-wide .VPNavBar.has-sidebar .content {
+  max-width: none;
+}
+@media (min-width: 960px) {
+  /* Article fills the space between sidebar and aside instead of centring. */
+  .mdbook-wide .VPDoc .container {
+    margin-inline: 0;
+    padding-inline: 32px;
+  }
+  /* Scoped to the article wrapper: the on-this-page outline also has a `.content`
+     element, and it carries the divider border + the padding that keeps its text
+     off that line. Widening must not strip it. */
+  .mdbook-wide .VPDoc .content-container > .content {
+    max-width: none;
+    padding-inline: 0;
+  }
+}
+@media (min-width: 1280px) {
+  /* The aside is pushed to the far right rather than sitting beside a centred
+     column, which is what made wide tables run underneath it. */
+  .mdbook-wide .VPDoc.has-aside .content-container {
+    margin-inline: 0;
+  }
+  .mdbook-wide .VPDoc.has-aside .aside {
+    max-width: 256px;
+    padding-left: 32px;
+  }
+  /* Breathing room between the outline's divider line and its text. */
+  .mdbook-wide .VPDocAsideOutline .content {
+    padding-left: 20px;
+  }
+}
+/* Wide tables scroll inside the article rather than forcing the page wider. */
+.mdbook-wide .vp-doc div[class*='language-'],
+.mdbook-wide .vp-doc table {
+  max-width: 100%;
+}
+
+/* ── Zoom control (src/theme/zoom.mjs) ─────────────────────────────────────
+   Scales the article only, so the nav bar and sidebar keep their size and the
+   layout does not shift while zooming. `zoom` (rather than a transform) keeps
+   the page in normal flow, so tables still wrap and scroll correctly. */
+.VPDoc {
+  zoom: var(--mdbook-zoom, 1);
+}
+.mdbook-zoom {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: 8px;
+  padding: 2px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+}
+@media (min-width: 768px) {
+  .mdbook-zoom { display: inline-flex; }
+}
+.mdbook-zoom-btn,
+.mdbook-zoom-level {
+  border: 0;
+  background: transparent;
+  color: var(--vp-c-text-2);
+  cursor: pointer;
+  border-radius: 6px;
+  line-height: 1;
+  transition: color 0.2s, background-color 0.2s;
+}
+.mdbook-zoom-btn {
+  width: 24px;
+  height: 24px;
+  font-size: 15px;
+}
+.mdbook-zoom-level {
+  min-width: 44px;
+  height: 24px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.mdbook-zoom-btn:hover:not(:disabled),
+.mdbook-zoom-level:hover {
+  color: var(--vp-c-brand-1);
+  background: var(--vp-c-default-soft);
+}
+.mdbook-zoom-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+/* Presentation mode has its own sizing; keep the control out of the way. */
+.mdbook-present .mdbook-zoom { display: none !important; }

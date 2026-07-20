@@ -7,6 +7,9 @@ import { h, onMounted, watch, nextTick } from 'vue'
 import Comments from './comments.mjs'
 import Present from './present.mjs'
 import Footer from './footer.mjs'
+import Breadcrumbs from './breadcrumbs.mjs'
+import Related from './related.mjs'
+import Zoom from './zoom.mjs'
 import './styles/base.css'
 import './styles/smart-text.css'
 
@@ -60,7 +63,9 @@ export default {
   // presentation-mode controls once per layout.
   Layout: () =>
     h(DefaultTheme.Layout, null, {
-      'doc-after': () => h(Comments),
+      'nav-bar-content-after': () => h(Zoom),
+      'doc-before': () => h(Breadcrumbs),
+      'doc-after': () => [h(Related), h(Comments)],
       'layout-bottom': () => [h(Footer), h(Present)]
     }),
   setup() {

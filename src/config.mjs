@@ -68,7 +68,12 @@ export function loadConfig(projectRoot, overrides = {}) {
     nav: data.nav || [],
     sidebar: data.sidebar || null, // if set, fully overrides the generated sidebar
     sidebarExtra: data.sidebarExtra || [], // appended to the generated sidebar
-    search: data.search ?? true,
+    // `search: true|false`, or `search: { enabled, exclude: [patterns] }`.
+    // Excluded pages stay published but are kept out of the search index — a few
+    // huge pages (a generated glossary, a changelog) can otherwise dominate it.
+    search: typeof data.search === 'object' && data.search ? (data.search.enabled ?? true) : (data.search ?? true),
+    searchExclude:
+      (typeof data.search === 'object' && data.search && data.search.exclude) || [],
     comments: data.comments || null, // e.g. { provider: giscus, repo, repoId, category, categoryId }
     footer: data.footer || null, // site footer: { message, copyright } (inline HTML allowed)
     locales: data.locales || null, // resolved from content when null
