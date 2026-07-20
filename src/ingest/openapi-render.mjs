@@ -197,10 +197,17 @@ export function expandOpenapi(text, specs, opts = {}) {
   if (!text.includes('{% openapi')) return text
   const tryIt = opts.tryIt ?? true
   const collapsedDefault = opts.collapsed ?? true
+  // Names declared in config, so a spec that is configured but failed to load
+  // this build is not reported as if the author had mistyped it.
+  const configured = new Set(opts.configured || [])
   return text.replace(BLOCK_RE, (whole, kind, attrStr) => {
     const attrs = parseAttrs(attrStr)
     const model = specs?.[attrs.src]
-    if (!model) return `> OpenAPI: no spec named \`${attrs.src || '(missing src)'}\` is configured.`
+    if (!model) {
+      return configured.has(attrs.src)
+        ? `> OpenAPI: \`${attrs.src}\` could not be loaded for this build — see the build log.`
+        : `> OpenAPI: no spec named \`${attrs.src || '(missing src)'}\` is configured.`
+    }
 
     if (kind === 'openapi-schema') return renderSchema(model, attrs.name || '')
 

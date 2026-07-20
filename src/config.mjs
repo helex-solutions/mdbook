@@ -133,13 +133,18 @@ function normalizeOpenapi(data, projectRoot) {
   //       headers: { Authorization: "Bearer ${EMR_API_TOKEN}" }
   // `${VAR}` is resolved from the build environment — a token belongs in CI, not
   // in a config file, and is never written to the built site.
+  // `openapi.headers` applies to every spec (a whole API behind one token), and
+  // a spec's own `headers` override it per entry.
+  const defaultHeaders = data.headers || null
   const specs = {}
   for (const [name, value] of Object.entries(data.specs || {})) {
     const src = typeof value === 'string' ? value : value?.url
     if (!src) continue
+    const own = (typeof value === 'object' && value?.headers) || null
+    const headers = defaultHeaders || own ? { ...(defaultHeaders || {}), ...(own || {}) } : null
     specs[name] = {
       url: /^https?:\/\//i.test(src) ? String(src) : path.resolve(projectRoot, src),
-      headers: (typeof value === 'object' && value?.headers) || null
+      headers
     }
   }
   if (!Object.keys(specs).length) return null
