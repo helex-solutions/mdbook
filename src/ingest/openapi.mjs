@@ -159,7 +159,12 @@ export async function loadOpenapiSpecs(cfg, log = () => {}) {
   // Failures are grouped by cause: one unset token across 34 specs is one
   // problem, not 34, and 34 identical lines bury everything else in the log.
   const problems = new Map()
-  const note = (reason, name) => problems.set(reason, [...(problems.get(reason) || []), name])
+  // Group on the *kind* of failure, not the literal message: each one embeds its
+  // own URL, which would otherwise make 32 identical 401s look like 32 problems.
+  const note = (reason, name) => {
+    const key = reason.replace(/https?:\/\/\S*[^\s:]/g, 'the service')
+    problems.set(key, [...(problems.get(key) || []), name])
+  }
 
   for (const [name, spec] of Object.entries(cfg.openapi.specs)) {
     const { url: src, headers } = typeof spec === 'string' ? { url: spec, headers: null } : spec

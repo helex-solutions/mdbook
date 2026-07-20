@@ -204,8 +204,17 @@ export function expandOpenapi(text, specs, opts = {}) {
     const attrs = parseAttrs(attrStr)
     const model = specs?.[attrs.src]
     if (!model) {
+      // A configured spec that isn't in this build is a normal, temporary state
+      // (the service isn't up yet, or was unreachable). Say so in the reader's
+      // terms — a build-log reference means nothing to someone reading the site.
       return configured.has(attrs.src)
-        ? `> OpenAPI: \`${attrs.src}\` could not be loaded for this build — see the build log.`
+        ? [
+            `> **API reference unavailable**`,
+            `>`,
+            `> The \`${attrs.src}\` service did not return an OpenAPI document when this site was`,
+            `> built. This page fills in automatically once the service publishes one.`,
+            `{.is-warning}`
+          ].join('\n')
         : `> OpenAPI: no spec named \`${attrs.src || '(missing src)'}\` is configured.`
     }
 

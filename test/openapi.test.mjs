@@ -149,10 +149,10 @@ test('expandOpenapi: unknown spec or empty selector degrades to a visible note',
   assert.match(expandOpenapi('{% openapi src="nope" %}', specs), /no spec named `nope`/)
   // Configured but absent from this build (e.g. the fetch failed) reads
   // differently — telling a reader it "is not configured" would be wrong.
-  assert.match(
-    expandOpenapi('{% openapi src="acc" %}', specs, { configured: ['acc'] }),
-    /`acc` could not be loaded for this build/
-  )
+  const pending = expandOpenapi('{% openapi src="acc" %}', specs, { configured: ['acc'] })
+  assert.match(pending, /API reference unavailable/)
+  assert.match(pending, /fills in automatically once the service publishes one/)
+  assert.doesNotMatch(pending, /build log/, 'a reader is not sent to a build log')
   assert.match(expandOpenapi('{% openapi src="petstore" tag="Ghost" %}', specs), /no operation .* matched/)
 })
 
