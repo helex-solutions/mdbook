@@ -62,6 +62,28 @@ export function typeOf(schema, depth = 0) {
   return t || (schema.properties ? 'object' : '')
 }
 
+// Within a path, conventional REST order reads better than alphabetical — GET
+// before DELETE is what every API reference does, and it matches the order a
+// reader thinks in (read, create, replace, amend, remove).
+const METHOD_ORDER = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'TRACE']
+
+// A generated document lists operations in whatever order the framework found
+// the controllers, which is arbitrary to a reader. Sort by path, then method.
+// `sort: 'none'` keeps the document's own order for a hand-authored spec whose
+// sequence is deliberate.
+export function sortOperations(ops, mode = 'path') {
+  if (mode === 'none') return ops
+  const rank = (m) => {
+    const i = METHOD_ORDER.indexOf(m)
+    return i === -1 ? METHOD_ORDER.length : i
+  }
+  return [...ops].sort(
+    (a, b) =>
+      a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' }) ||
+      rank(a.method) - rank(b.method)
+  )
+}
+
 // Select the operations a block refers to.
 export function selectOperations(model, attrs) {
   if (!model) return []
@@ -197,6 +219,7 @@ export function expandOpenapi(text, specs, opts = {}) {
   if (!text.includes('{% openapi')) return text
   const tryIt = opts.tryIt ?? true
   const collapsedDefault = opts.collapsed ?? true
+  const sortMode = opts.sort ?? 'path'
   // Names declared in config, so a spec that is configured but failed to load
   // this build is not reported as if the author had mistyped it.
   const configured = new Set(opts.configured || [])
@@ -220,7 +243,7 @@ export function expandOpenapi(text, specs, opts = {}) {
 
     if (kind === 'openapi-schema') return renderSchema(model, attrs.name || '')
 
-    const ops = selectOperations(model, attrs)
+    const ops = sortOperations(selectOperations(model, attrs), sortMode)
     if (!ops.length) return `> OpenAPI: no operation in \`${attrs.src}\` matched this selector.`
     // A block may override the site default: collapsed="false" to expand.
     const collapsed = attrs.collapsed == null ? collapsedDefault : !/^(false|no|0)$/i.test(attrs.collapsed)

@@ -171,6 +171,7 @@ function stageContent(cfg, model, openapiSpecs = {}) {
       if (cfg.openapi) text = expandOpenapi(text, openapiSpecs, {
           tryIt: cfg.openapi.tryIt,
           collapsed: cfg.openapi.collapsed,
+          sort: cfg.openapi.sort,
           configured: Object.keys(cfg.openapi.specs)
         })
       // Harden against VitePress's Vue compiler (stray `<Tag>` / `{{…}}` in prose).

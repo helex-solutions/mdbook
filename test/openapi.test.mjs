@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { modelFromDocument, authFromSchemes, expandEnv, effectiveServers } from '../src/ingest/openapi.mjs'
-import { expandOpenapi, parseAttrs, typeOf, selectOperations } from '../src/ingest/openapi-render.mjs'
+import { expandOpenapi, parseAttrs, typeOf, selectOperations, sortOperations } from '../src/ingest/openapi-render.mjs'
 
 const DOC = {
   openapi: '3.1.0',
@@ -207,4 +207,30 @@ test('modelFromDocument: the reachable server reaches operations too', () => {
   }, { sourceUrl: 'https://emr.example.com/api/acc/api-docs' })
   assert.deepEqual(m.servers, [{ url: 'https://emr.example.com' }])
   assert.deepEqual(m.operations[0].servers, [{ url: 'https://emr.example.com' }])
+})
+
+test('sortOperations: by path, then conventional REST method order', () => {
+  const ops = [
+    { path: '/zebra', method: 'GET' },
+    { path: '/alpha', method: 'DELETE' },
+    { path: '/alpha', method: 'GET' },
+    { path: '/alpha', method: 'POST' }
+  ]
+  assert.deepEqual(
+    sortOperations(ops).map((o) => `${o.method} ${o.path}`),
+    ['GET /alpha', 'POST /alpha', 'DELETE /alpha', 'GET /zebra'],
+    'paths alphabetical; GET before DELETE rather than alphabetical by method'
+  )
+})
+
+test('sortOperations: numeric-aware, and `none` keeps document order', () => {
+  const ops = [{ path: '/v10/a', method: 'GET' }, { path: '/v2/a', method: 'GET' }]
+  assert.deepEqual(sortOperations(ops).map((o) => o.path), ['/v2/a', '/v10/a'], 'v2 before v10')
+  assert.deepEqual(sortOperations(ops, 'none'), ops, 'document order preserved')
+})
+
+test('expandOpenapi: operations render sorted by default', () => {
+  const out = expandOpenapi('{% openapi src="petstore" tag="Pets" %}', specs, { tryIt: false })
+  const order = [...out.matchAll(/^### `(\w+)` `([^`]+)`/gm)].map((m) => `${m[1]} ${m[2]}`)
+  assert.deepEqual(order, ['GET /pets', 'POST /pets'])
 })

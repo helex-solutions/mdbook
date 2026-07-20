@@ -56,15 +56,24 @@ function buildConsole(root, cfg) {
   // all (or only a demo host), and the reader still needs somewhere to send the
   // request. Known servers are offered as suggestions.
   const known = servers.filter(Boolean)
+
+  // When this operation's path is covered by a configured dev proxy, default to
+  // this site's own origin: the request then leaves the browser same-origin and
+  // the dev server forwards it, which is the whole point of configuring a proxy.
+  // Sending to the upstream directly would need CORS the API may not serve.
+  const proxied = Object.keys(cfg.proxy || {}).some((prefix) => pathTpl.startsWith(prefix))
+  const origin = typeof location === 'undefined' ? '' : location.origin
+  const choices = [...new Set([...(proxied ? [origin] : []), ...known])]
+
   const listId = `mdbook-servers-${Math.random().toString(36).slice(2, 8)}`
   const serverSel = el('input', {
     class: 'mdbook-tryit-input',
-    value: known[0] || '',
+    value: choices[0] || '',
     placeholder: 'https://api.example.com',
-    list: known.length ? listId : null
+    list: choices.length ? listId : null
   })
-  const serverList = known.length
-    ? el('datalist', { id: listId }, known.map((s) => el('option', { value: s })))
+  const serverList = choices.length
+    ? el('datalist', { id: listId }, choices.map((s) => el('option', { value: s })))
     : null
   const bodyArea = hasBody ? el('textarea', { class: 'mdbook-tryit-body', rows: '6', placeholder: '{ }' }) : null
   const out = el('pre', { class: 'mdbook-tryit-out' })
@@ -159,6 +168,66 @@ function buildConsole(root, cfg) {
   refreshAuth()
 }
 
+// Live filter for a page of operations. A reference page can carry hundreds of
+// them, and site search only gets a reader to the *page* — this narrows to the
+// operation. Matches method, path and summary.
+//
+// Heading and <details> are siblings rather than one wrapper, because wrapping
+// them in raw HTML would stop markdown-it parsing the heading and cost the page
+// its outline entries and anchors. So the filter toggles the pair together.
+function installFilter(root) {
+  const ops = [...root.querySelectorAll('details.mdbook-op')]
+  if (ops.length < 8 || root.querySelector('.mdbook-op-filter')) return
+
+  // Pair each operation with its heading, and note the section it sits under.
+  const items = ops.map((details) => {
+    let heading = details.previousElementSibling
+    while (heading && !/^H[1-6]$/.test(heading.tagName)) heading = heading.previousElementSibling
+    const text = `${heading?.textContent || ''} ${details.querySelector('summary')?.textContent || ''}`
+    return { details, heading, hay: text.toLowerCase().replace(/\s+/g, ' ') }
+  })
+  const sections = [...root.querySelectorAll('h2')]
+
+  const input = el('input', {
+    class: 'mdbook-op-filter-input',
+    type: 'search',
+    placeholder: `Filter ${ops.length} operations — path, method or summary`,
+    'aria-label': 'Filter operations'
+  })
+  const count = el('span', { class: 'mdbook-op-filter-count' })
+
+  const apply = () => {
+    const q = input.value.trim().toLowerCase()
+    let shown = 0
+    for (const it of items) {
+      const hit = !q || q.split(/\s+/).every((w) => it.hay.includes(w))
+      it.details.hidden = !hit
+      if (it.heading) it.heading.hidden = !hit
+      if (hit) shown++
+    }
+    // A section whose operations are all filtered out is just a stray heading.
+    for (const h2 of sections) {
+      let n = h2.nextElementSibling
+      let any = false
+      while (n && n.tagName !== 'H2') {
+        if (n.matches?.('details.mdbook-op') && !n.hidden) { any = true; break }
+        n = n.nextElementSibling
+      }
+      h2.hidden = !!q && !any
+    }
+    count.textContent = q ? `${shown} of ${ops.length}` : ''
+  }
+
+  input.addEventListener('input', apply)
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { input.value = ''; apply() }
+  })
+
+  const bar = el('div', { class: 'mdbook-op-filter' }, [input, count])
+  const h1 = root.querySelector('h1')
+  h1 ? h1.after(bar) : root.prepend(bar)
+}
+
 export default defineComponent({
   name: 'MdbookOpenapi',
   setup() {
@@ -178,6 +247,8 @@ export default defineComponent({
         })
         return
       }
+      const doc = document.querySelector('.vp-doc')
+      if (doc) installFilter(doc)
       if (cfg.tryIt === false) return
       document.querySelectorAll('.mdbook-tryit').forEach((n) => buildConsole(n, cfg))
     }
