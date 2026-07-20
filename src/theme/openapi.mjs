@@ -10,17 +10,8 @@
 import { defineComponent, h, onMounted, watch, nextTick } from 'vue'
 import { useData, useRoute } from 'vitepress'
 import { login, logout, getToken, completeLogin } from './oidc.mjs'
-
-const el = (tag, props = {}, children = []) => {
-  const n = document.createElement(tag)
-  for (const [k, v] of Object.entries(props)) {
-    if (k === 'class') n.className = v
-    else if (k.startsWith('on')) n.addEventListener(k.slice(2).toLowerCase(), v)
-    else if (v != null) n.setAttribute(k, v)
-  }
-  for (const c of [].concat(children)) n.append(c)
-  return n
-}
+import { el } from './dom.mjs'
+import { installFilter } from './op-filter.mjs'
 
 // Path templating: /pets/{petId} + { petId: 7 } -> /pets/7
 const fillPath = (p, values) => p.replace(/\{([^}]+)\}/g, (m, k) => encodeURIComponent(values[k] ?? m))
@@ -166,66 +157,6 @@ function buildConsole(root, cfg) {
     out
   )
   refreshAuth()
-}
-
-// Live filter for a page of operations. A reference page can carry hundreds of
-// them, and site search only gets a reader to the *page* — this narrows to the
-// operation. Matches method, path and summary.
-//
-// Heading and <details> are siblings rather than one wrapper, because wrapping
-// them in raw HTML would stop markdown-it parsing the heading and cost the page
-// its outline entries and anchors. So the filter toggles the pair together.
-function installFilter(root) {
-  const ops = [...root.querySelectorAll('details.mdbook-op')]
-  if (ops.length < 8 || root.querySelector('.mdbook-op-filter')) return
-
-  // Pair each operation with its heading, and note the section it sits under.
-  const items = ops.map((details) => {
-    let heading = details.previousElementSibling
-    while (heading && !/^H[1-6]$/.test(heading.tagName)) heading = heading.previousElementSibling
-    const text = `${heading?.textContent || ''} ${details.querySelector('summary')?.textContent || ''}`
-    return { details, heading, hay: text.toLowerCase().replace(/\s+/g, ' ') }
-  })
-  const sections = [...root.querySelectorAll('h2')]
-
-  const input = el('input', {
-    class: 'mdbook-op-filter-input',
-    type: 'search',
-    placeholder: `Filter ${ops.length} operations — path, method or summary`,
-    'aria-label': 'Filter operations'
-  })
-  const count = el('span', { class: 'mdbook-op-filter-count' })
-
-  const apply = () => {
-    const q = input.value.trim().toLowerCase()
-    let shown = 0
-    for (const it of items) {
-      const hit = !q || q.split(/\s+/).every((w) => it.hay.includes(w))
-      it.details.hidden = !hit
-      if (it.heading) it.heading.hidden = !hit
-      if (hit) shown++
-    }
-    // A section whose operations are all filtered out is just a stray heading.
-    for (const h2 of sections) {
-      let n = h2.nextElementSibling
-      let any = false
-      while (n && n.tagName !== 'H2') {
-        if (n.matches?.('details.mdbook-op') && !n.hidden) { any = true; break }
-        n = n.nextElementSibling
-      }
-      h2.hidden = !!q && !any
-    }
-    count.textContent = q ? `${shown} of ${ops.length}` : ''
-  }
-
-  input.addEventListener('input', apply)
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { input.value = ''; apply() }
-  })
-
-  const bar = el('div', { class: 'mdbook-op-filter' }, [input, count])
-  const h1 = root.querySelector('h1')
-  h1 ? h1.after(bar) : root.prepend(bar)
 }
 
 export default defineComponent({
