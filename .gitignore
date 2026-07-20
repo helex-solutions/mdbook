@@ -1,3 +1,9 @@
 node_modules/
 *.log
 .DS_Store
+
+# Build artifacts from running mdbook against its own directory by mistake.
+# `.mdbook/.cache/site/node_modules` is a symlink, and an action repo containing
+# one cannot be staged by GitHub Actions — it fails every consumer's build.
+.mdbook/
+.claude/
