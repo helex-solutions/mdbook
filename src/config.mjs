@@ -126,10 +126,21 @@ export function applySpaceConfig(cfg, model) {
 // feature, so the two can never disagree. `enabled: false` still turns it off.
 function normalizeOpenapi(data, projectRoot) {
   if (!data || data.enabled === false) return null
+  // A spec is either a bare file/URL, or an object carrying fetch headers for a
+  // document that sits behind auth:
+  //     mpi:
+  //       url: https://api.example.com/api/mpi/api-docs
+  //       headers: { Authorization: "Bearer ${EMR_API_TOKEN}" }
+  // `${VAR}` is resolved from the build environment — a token belongs in CI, not
+  // in a config file, and is never written to the built site.
   const specs = {}
-  for (const [name, src] of Object.entries(data.specs || {})) {
+  for (const [name, value] of Object.entries(data.specs || {})) {
+    const src = typeof value === 'string' ? value : value?.url
     if (!src) continue
-    specs[name] = /^https?:\/\//i.test(src) ? String(src) : path.resolve(projectRoot, src)
+    specs[name] = {
+      url: /^https?:\/\//i.test(src) ? String(src) : path.resolve(projectRoot, src),
+      headers: (typeof value === 'object' && value?.headers) || null
+    }
   }
   if (!Object.keys(specs).length) return null
   const auth = data.auth || null

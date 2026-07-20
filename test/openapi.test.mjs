@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { modelFromDocument, authFromSchemes } from '../src/ingest/openapi.mjs'
+import { modelFromDocument, authFromSchemes, expandEnv } from '../src/ingest/openapi.mjs'
 import { expandOpenapi, parseAttrs, typeOf, selectOperations } from '../src/ingest/openapi-render.mjs'
 
 const DOC = {
@@ -153,4 +153,18 @@ test('expandOpenapi: unknown spec or empty selector degrades to a visible note',
 test('expandOpenapi: text without a block is returned untouched', () => {
   const src = '# Title\n\nJust prose.\n'
   assert.equal(expandOpenapi(src, specs), src)
+})
+
+test('expandEnv: resolves ${VAR} from the build environment', () => {
+  const missing = []
+  assert.equal(expandEnv('Bearer ${TOK}', missing, { TOK: 'abc' }), 'Bearer abc')
+  assert.deepEqual(missing, [])
+})
+
+test('expandEnv: an unset or empty variable is reported, never substituted literally', () => {
+  const missing = []
+  // Empty string counts as unset: sending "Bearer " upstream would just 401.
+  const out = expandEnv('Bearer ${TOK} ${OTHER}', missing, { TOK: '' })
+  assert.doesNotMatch(out, /\$\{/, 'no literal ${VAR} is ever sent upstream')
+  assert.deepEqual(missing.sort(), ['OTHER', 'TOK'], 'both names are reported')
 })

@@ -104,6 +104,42 @@ export function authFromSchemes(securitySchemes = {}) {
   return null
 }
 
+// Resolve `${VAR}` against the build environment. Missing names are collected
+// rather than substituted, so a build never sends a literal "${TOKEN}" upstream.
+export function expandEnv(value, missing = [], env = process.env) {
+  return String(value).replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_m, name) => {
+    if (env[name] == null || env[name] === '') {
+      missing.push(name)
+      return ''
+    }
+    return env[name]
+  })
+}
+
+// Fetch a document that needs headers (an API behind auth) and hand the parsed
+// object to the resolver. Only internal $refs can be followed in this mode —
+// which is what a generated spec emits.
+async function fetchWithHeaders(url, headers, env = process.env) {
+  const missing = []
+  const resolved = Object.fromEntries(
+    Object.entries(headers).map(([k, v]) => [k, expandEnv(v, missing, env)])
+  )
+  if (missing.length) {
+    const err = new Error(`environment variable(s) not set: ${[...new Set(missing)].join(', ')}`)
+    err.missingEnv = true
+    throw err
+  }
+  const res = await fetch(url, { headers: resolved, redirect: 'follow' })
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`)
+  const text = await res.text()
+  try {
+    return JSON.parse(text)
+  } catch {
+    const yaml = (await import('js-yaml')).default
+    return yaml.load(text)
+  }
+}
+
 // Load and resolve every configured spec. Never throws: a spec that cannot be
 // read is reported and skipped, so one bad document can't fail a whole site.
 export async function loadOpenapiSpecs(cfg, log = () => {}) {
@@ -120,14 +156,15 @@ export async function loadOpenapiSpecs(cfg, log = () => {}) {
     return {}
   }
 
-  for (const [name, src] of Object.entries(cfg.openapi.specs)) {
+  for (const [name, spec] of Object.entries(cfg.openapi.specs)) {
+    const { url: src, headers } = typeof spec === 'string' ? { url: spec, headers: null } : spec
     const cacheFile = path.join(dir, `${name}.json`)
     let doc = null
     try {
       // bundle(), not dereference(): external files and URLs are pulled into one
       // document, but internal $refs stay put. That keeps schema *names* (so a
       // response reads `Pet[]`, not `object[]`) and makes recursive schemas safe.
-      doc = await parser.bundle(src)
+      doc = await parser.bundle(headers ? await fetchWithHeaders(src, headers) : src)
       fs.mkdirSync(dir, { recursive: true })
       fs.writeFileSync(cacheFile, JSON.stringify(doc))
     } catch (e) {
@@ -137,7 +174,8 @@ export async function loadOpenapiSpecs(cfg, log = () => {}) {
         doc = JSON.parse(fs.readFileSync(fallback, 'utf8'))
         log(pc.yellow(`openapi: ${name} unreachable (${e.message.split('\n')[0]}) — using cached copy`))
       } else {
-        log(pc.yellow(`openapi: ${name} could not be loaded — ${e.message.split('\n')[0]}`))
+        const hint = e.missingEnv ? ' (set it in the build environment)' : ''
+        log(pc.yellow(`openapi: ${name} could not be loaded — ${e.message.split('\n')[0]}${hint}`))
         continue
       }
     }

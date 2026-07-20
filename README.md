@@ -316,6 +316,22 @@ openapi:
     billing:  https://api.example.com/openapi.json
 ```
 
+A document behind authentication takes headers, with `${VAR}` resolved from the build
+environment — a token belongs in CI, never in a config file:
+
+```yaml
+openapi:
+  specs:
+    mpi:
+      url: https://api.example.com/api/mpi/api-docs
+      headers:
+        Authorization: Bearer ${API_TOKEN}
+```
+
+The token is used only to fetch the document; it is never written to the built site or the
+cache. If the variable is unset, mdbook says so by name and falls back to the cached copy
+rather than failing the build.
+
 Documents are read **at build time**, not in the browser. That means the site works on an
 air-gapped network, the docs are pinned to the spec they were built from, and — unlike a
 client-side viewer — your API does **not** need to allow CORS from the docs site. A resolved
