@@ -70,30 +70,35 @@ function buildConsole(root, cfg) {
   const out = el('pre', { class: 'mdbook-tryit-out' })
   const authNote = el('span', { class: 'mdbook-tryit-auth' })
 
+  // Sign-in exists only when a client is configured. Without `openapi.auth`
+  // there is nothing to sign in to, so the button is not created at all rather
+  // than rendered dead or hidden — an API that needs no auth shows no auth UI.
+  const canSignIn = !!cfg.auth?.clientId
+  const loginBtn = canSignIn
+    ? el('button', {
+        class: 'mdbook-tryit-btn',
+        type: 'button',
+        onClick: async () => {
+          if (getToken()) {
+            logout()
+            refreshAuth()
+            return
+          }
+          try {
+            await login(specInfo.auth, cfg.auth)
+          } catch (e) {
+            out.textContent = `Sign-in failed: ${e.message}`
+          }
+        }
+      })
+    : null
+
   const refreshAuth = () => {
     const t = getToken()
-    authNote.textContent = t ? 'authenticated' : cfg.auth?.clientId ? 'not signed in' : ''
+    authNote.textContent = t ? 'authenticated' : canSignIn ? 'not signed in' : ''
     authNote.className = 'mdbook-tryit-auth' + (t ? ' is-on' : '')
-    loginBtn.textContent = t ? 'Sign out' : 'Sign in'
-    loginBtn.style.display = cfg.auth?.clientId ? '' : 'none'
+    if (loginBtn) loginBtn.textContent = t ? 'Sign out' : 'Sign in'
   }
-
-  const loginBtn = el('button', {
-    class: 'mdbook-tryit-btn',
-    type: 'button',
-    onClick: async () => {
-      if (getToken()) {
-        logout()
-        refreshAuth()
-        return
-      }
-      try {
-        await login(specInfo.auth, cfg.auth)
-      } catch (e) {
-        out.textContent = `Sign-in failed: ${e.message}`
-      }
-    }
-  })
 
   const send = async () => {
     out.textContent = 'Sending…'
@@ -143,7 +148,7 @@ function buildConsole(root, cfg) {
       authNote,
       loginBtn,
       el('button', { class: 'mdbook-tryit-btn is-primary', type: 'button', onClick: send }, 'Send')
-    ]),
+    ].filter(Boolean)),
     el('div', { class: 'mdbook-tryit-form' }, [
       el('label', { class: 'mdbook-tryit-field' }, [el('span', {}, 'server'), serverSel, serverList].filter(Boolean)),
       ...paramRows,
