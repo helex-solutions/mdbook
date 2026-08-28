@@ -7,3 +7,6 @@ node_modules/
 # one cannot be staged by GitHub Actions — it fails every consumer's build.
 .mdbook/
 .claude/
+
+# Local secrets for the Keycloak provisioning scripts
+.env
