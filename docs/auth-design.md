@@ -38,6 +38,7 @@ auth:
   clientId: owlexicon
   # clientSecret: ${AUTH_OIDC_CLIENT_SECRET}  # optional — confidential client; env-resolved
   scopes: [openid, profile]
+  logout: local                           # local (default) | idp — see `mdbook serve`
   roleClaims: roles                       # dotted paths, comma-separated fallbacks
                                           # e.g. "realm_access.roles,resource_access.owlexicon.roles"
   access: public                          # site default: public | authenticated | [role, …]
@@ -140,7 +141,12 @@ entry point for any site with protected content.
 - Endpoints:
   - `GET /auth/login?returnTo=…` — starts the redirect;
   - `GET /auth/callback` — server-side code exchange; sets the session; redirects to `returnTo`;
-  - `GET /auth/logout` — drops the session, RP-initiated logout via `end_session_endpoint`;
+  - `GET /auth/logout` — drops this site's session and lands on the generated
+    `signed-out` page. **Local by default**: ending the shared realm session
+    would sign the reader out of every other application on that realm, which is
+    rarely what "sign out of the docs" means. `auth.logout: idp` opts in to
+    RP-initiated logout via `end_session_endpoint`. A local sign-out never
+    contacts the provider, so it still works when the provider is down;
   - `GET /auth/session` — `{ user, roles }` JSON for the theme; `401` when anonymous.
 - Session: **signed HttpOnly cookie** carrying subject, display name, roles, expiry. No token in
   browser storage, and no `?token=` query parameters on asset URLs — the cookie is what lets a

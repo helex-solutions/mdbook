@@ -229,6 +229,11 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
     console.log(`${ip} ${user || '-'} ${req.method} ${req.url} ${status}${note ? ` ${note}` : ''}`)
   }
 
+  // Paths handled as endpoints. Everything else under /auth/ (the generated
+  // `signed-out` and `denied` pages) is an ordinary file — intercepting the
+  // whole prefix 404'd the page the provider redirects to after logout.
+  const AUTH_ENDPOINTS = new Set(['/auth/session', '/auth/login', '/auth/callback', '/auth/logout'])
+
   // ---- OIDC endpoints (verify mode) ----
   async function handleAuth(req, res, url, session) {
     const secure = originFor(req, auth).startsWith('https://')
@@ -246,7 +251,9 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
     if (!auth?.issuer || !auth?.clientId) {
       return send(res, 500, 'auth.issuer / auth.clientId not configured')
     }
-    const doc = await discover(auth.issuer)
+    // A local sign-out is pure cookie work, so it must still succeed when the
+    // provider is unreachable — that is exactly when a reader wants out.
+    const doc = auth.logout === 'local' && url.pathname === '/auth/logout' ? {} : await discover(auth.issuer)
     const origin = originFor(req, auth)
     const redirectUri = `${origin}${base}auth/callback`.replace(/([^:])\/\//g, '$1/')
 
@@ -330,10 +337,14 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
     if (url.pathname === '/auth/logout') {
       setCookie(res, 'mdbook-session', '', { path: base, clear: true })
       const landing = `${origin}${base}auth/signed-out`.replace(/([^:])\/\//g, '$1/')
-      const location = doc.end_session_endpoint
-        ? `${doc.end_session_endpoint}?${new URLSearchParams({ client_id: auth.clientId, post_logout_redirect_uri: landing })}`
-        : landing
-      access(req, res, 302, session?.name, 'signed-out')
+      // Local by default: this site's session ends, the realm session does not.
+      // Ending the shared SSO session would sign the reader out of every other
+      // app on that realm, which is rarely what "sign out of the docs" means.
+      const location =
+        auth.logout === 'idp' && doc.end_session_endpoint
+          ? `${doc.end_session_endpoint}?${new URLSearchParams({ client_id: auth.clientId, post_logout_redirect_uri: landing })}`
+          : landing
+      access(req, res, 302, session?.name, `signed-out (${auth.logout})`)
       return send(res, 302, '', 'text/plain', { Location: location })
     }
 
@@ -342,9 +353,12 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
 
   const serveFile = (res, file, status = 200) => {
     const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream'
-    const cache = /\/assets\//.test(file.replace(/\\/g, '/'))
+    const p = file.replace(/\\/g, '/')
+    const cache = /\/assets\//.test(p)
       ? 'public, max-age=31536000, immutable'
-      : 'no-cache'
+      : /\/auth\//.test(p)
+        ? 'no-store'
+        : 'no-cache'
     res.writeHead(status, { 'Content-Type': type, 'Cache-Control': cache })
     fs.createReadStream(file).pipe(res)
   }
@@ -360,7 +374,9 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
 
       const session = auth ? await identityOf(req) : null
 
-      if (auth && route.startsWith('/auth/')) return await handleAuth(req, res, new URL(route + url.search, 'http://internal'), session)
+      if (auth && AUTH_ENDPOINTS.has(route.replace(/\/$/, ''))) {
+        return await handleAuth(req, res, new URL(route.replace(/\/$/, '') + url.search, 'http://internal'), session)
+      }
 
       const requirement = auth ? requirementFor(acl, route) : 'public'
       if (!isAllowed(requirement, session)) {
