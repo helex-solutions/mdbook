@@ -1,9 +1,12 @@
 # Setting up a Keycloak realm for mdbook
 
 What mdbook needs from an identity provider is small: a **public client** with the
-site's callback registered, and **roles in a claim**. Everything below is
-`kcadm.sh`, so a realm can be rebuilt from scratch rather than reconstructed from
-memory of which buttons were clicked.
+site's callback registered, and **roles in a claim**.
+
+> **Scripts:** [`deploy/keycloak/`](../deploy/keycloak/) does all of this from a
+> `.env` — `cp .env.sample .env && ./setup-all.sh --with-idp google`. The commands
+> below are the same steps spelled out, for adapting by hand or for a Keycloak you
+> reach only through `kcadm`.
 
 The examples use realm `mdbook`, client `owlexicon` and site
 `https://tx.helex.dev/mdbook` — the [reference deployment](deployment.md#reference-deployment).
