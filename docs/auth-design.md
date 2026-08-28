@@ -33,19 +33,19 @@ the mdbook-level contract the implementation follows.
 # .mdbook/config.yml
 auth:
   issuer: https://sso.example.org/realms/htx
-  clientId: owlexicon-docs
-  # clientSecret: ${DOCS_CLIENT_SECRET}   # optional — confidential client; env-resolved
+  clientId: owlexicon
+  # clientSecret: ${AUTH_OIDC_CLIENT_SECRET}  # optional — confidential client; env-resolved
   scopes: [openid, profile]
-  rolesClaim: roles                       # dotted paths, comma-separated fallbacks
-                                          # e.g. "realm_access.roles,resource_access.docs.roles"
+  roleClaims: roles                       # dotted paths, comma-separated fallbacks
+                                          # e.g. "realm_access.roles,resource_access.owlexicon.roles"
   access: public                          # site default: public | authenticated | [role, …]
   rules:                                  # per-section rules; longest path match wins
     - path: internal/**
       access: [editor, admin]
     - path: handbook/**
-      access: authenticated
+      access: [wiki-handbook, admin]
   session:
-    secret: ${DOCS_SESSION_SECRET}        # cookie-signing key; env-resolved
+    secret: ${AUTH_SESSION_SECRET}        # cookie-signing key; env-resolved
     maxAge: 8h
   # Alternative to issuer verification — trust an authenticating gateway instead (see below):
   # trustProxy:
@@ -54,7 +54,7 @@ auth:
   # Accept tokens from more than one IdP (verify mode):
   # issuers:
   #   public:   { issuer: https://idp-a.example.org }
-  #   internal: { issuer: https://idp-b.example.org, jwksUrl: https://…/jwks }
+  #   internal: { issuer: https://idp-b.example.org, jwksUrl: https://…/jwks, audience: docs }
 ```
 
 Normalization follows the `normalizeOpenapi` pattern in `src/config.mjs` (dual
@@ -62,6 +62,23 @@ Normalization follows the `normalizeOpenapi` pattern in `src/config.mjs` (dual
 environment and never written into the site — the `openapi.specs.*.headers` precedent).
 `openapi.auth` falls back to the top-level `auth` block, so the try-it console and the site gate
 share one realm and client configured once.
+
+Every key falls back to the environment variable its ecosystem already uses, so a container is
+fully configured from env alone:
+
+| Config key | Env fallback |
+|---|---|
+| `issuer` | `AUTH_OIDC_AUTHORITY` (also `OAUTH_ISSUER`) |
+| `clientId` | `AUTH_OIDC_CLIENT_ID` (also `OAUTH_CLIENT_ID`) |
+| `clientSecret` | `AUTH_OIDC_CLIENT_SECRET` |
+| `scopes` | `AUTH_OIDC_SCOPE` (space-separated; also `OAUTH_SCOPE`) |
+| `roleClaims` | `AUTH_ROLE_CLAIMS` |
+| `access` | `GUEST_DISABLED=true` forces at least `authenticated` |
+| `session.secret` | `AUTH_SESSION_SECRET` |
+
+(`AUTH_OIDC_*` are the Helex runtime-config names; `OAUTH_*` and `AUTH_ROLE_CLAIMS`/`GUEST_DISABLED`
+are the TermX ones. The `issuers` map mirrors the Helex backend's
+`…auth.oidc.issuers.<name>.{issuer-uri, jwk-set-uri, audience}` semantics.)
 
 Per-page override, in frontmatter:
 
@@ -126,6 +143,10 @@ entry point for any site with protected content.
 - Session: **signed HttpOnly cookie** carrying subject, display name, roles, expiry. No token in
   browser storage, and no `?token=` query parameters on asset URLs — the cookie is what lets a
   plain `<img>` load a protected attachment.
+- Session lifetime is fixed in v1 (expiry re-runs the redirect, invisible while the IdP's SSO
+  session is alive). **Silent renewal is designed-for, post-v1**: the code exchange is
+  server-side, so `serve` can keep the refresh token and extend sessions sliding-window-style —
+  server state only, no cookie-format or endpoint change.
 - Per request: route → `acl.json` → serve | `302` to `/auth/login` (anonymous) | `403` page
   (authenticated, missing role).
 - Multi-issuer: `auth.issuers` maps issuer → JWKS; keys selected by issuer + `kid`, JWKS cached
@@ -157,15 +178,27 @@ config.
 
 ## Deployment recipes
 
+- **Linux server, published from the build (the primary target)** — CI builds the site and ships
+  the dist + `acl.json` to an own Linux server over SSH (rsync), where a **systemd-managed
+  `mdbook serve`** runs behind nginx. The GitHub Action grows a deploy target for this
+  (host/path/key inputs), so a repo goes content-push → built → live on its own server with no
+  third-party hosting in the path — explicitly replacing Cloudflare Pages + Access setups.
 - **nginx + serve** — nginx terminates TLS and proxies to `mdbook serve` (same shape as the
   TermX quick-start nginx configs). The `serve` port must not be reachable directly.
 - **Docker** — one image running `mdbook serve --project /site`; config via env
-  (`DOCS_SESSION_SECRET`, optionally `DOCS_CLIENT_SECRET`).
+  (`AUTH_OIDC_AUTHORITY`, `AUTH_OIDC_CLIENT_ID`, `AUTH_SESSION_SECRET`, optionally
+  `AUTH_OIDC_CLIENT_SECRET` — see the env table above).
 - **Same-origin with a Helex suite** — mount the docs under a path of the suite origin and point
   `auth.issuer` at the suite's `AUTH_OIDC_AUTHORITY`; the Keycloak SSO cookie makes sign-in
   invisible for suite users.
-- **Gateway-fronted** — Cloudflare Access / oauth2-proxy in front, `serve` in trust-proxy mode.
-  Note the gateway alone is hostname-granular; per-section rules still come from `serve`.
+- **Gateway-fronted** — oauth2-proxy or similar in front, `serve` in trust-proxy mode. The
+  gateway alone is hostname-granular; per-section rules still come from `serve`.
+
+When `auth:` is configured, `serve` **is** the deployment — there is no supported gated
+deployment without it. Multi-space portals (several wiki spaces under one origin, Confluence
+style — each space a section with its own rule, one login for the portal) are the intended
+shape; the multi-space ingest that composes several exports into one site is tracked alongside
+the auth implementation.
 
 ## Macro parity contract
 
