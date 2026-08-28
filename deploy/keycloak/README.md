@@ -43,6 +43,11 @@ supply secrets without writing one.
 `.env` holds secrets: it is gitignored, and worth `chmod 600`. Values must not
 carry a trailing `# comment` — the value is taken verbatim to the end of the line.
 
+> **A run rewrites the secret.** `setup-idp.sh` updates an existing provider from
+> `.env`, so running it with a placeholder value replaces a real secret with the
+> placeholder. Either supply the real value or leave it empty (empty skips the
+> provider and leaves it untouched) — never a stand-in.
+
 ## After running
 
 1. Register the broker callback with each provider — the script prints it:
