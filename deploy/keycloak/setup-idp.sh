@@ -63,7 +63,16 @@ PY
     api POST "/realms/${REALM}/identity-provider/instances/${alias}/mappers" "$m" >/dev/null
     case "$API_STATUS" in
       201|204) echo "  created  mapper ${name}" ;;
-      409)     echo "  exists   mapper ${name}" ;;
+      # Keycloak answers 400 (not 409) for a duplicate identity-provider mapper,
+      # so a re-run has to check whether the name is already there before
+      # calling it an error.
+      400|409)
+        if api GET "/realms/${REALM}/identity-provider/instances/${alias}/mappers" \
+             | grep -q "\"name\"[[:space:]]*:[[:space:]]*\"${name}\""; then
+          echo "  exists   mapper ${name}"
+        else
+          echo "  WARN     mapper ${name} -> HTTP $API_STATUS"
+        fi ;;
       *)       echo "  WARN     mapper ${name} -> HTTP $API_STATUS" ;;
     esac
   done
