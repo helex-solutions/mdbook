@@ -107,7 +107,7 @@ in [Authentication](#authentication).
        steps:
          - uses: actions/checkout@v7
          - id: mdbook
-           uses: helex-solutions/mdbook@v1.1.2   # pin to a release tag (see Versioning)
+           uses: helex-solutions/mdbook@v1.5.0   # pin to a release tag (see Versioning)
            with: { project: . }
          - uses: actions/configure-pages@v6
          - uses: actions/upload-pages-artifact@v5
@@ -133,7 +133,7 @@ in [Authentication](#authentication).
 
 ### Versioning
 
-Pin the action to a **release tag** (e.g. `helex-solutions/mdbook@v1.1.2`) so your site builds are
+Pin the action to a **release tag** (e.g. `helex-solutions/mdbook@v1.5.0`) so your site builds are
 deterministic — `main` can move without silently redeploying your site. See the
 [releases](https://github.com/helex-solutions/mdbook/releases). Use `@main` only if you want the
 latest, unreleased changes.
@@ -141,10 +141,10 @@ latest, unreleased changes.
 **To publish a new mdbook version:**
 
 ```bash
-git tag -a v1.0.1 -m "…" && git push origin v1.0.1   # patch; v1.1.0 for features
+git tag -a v1.5.1 -m "…" && git push origin v1.5.1   # patch; v1.6.0 for features
 ```
 
-Then bump `@v1.0.0` → `@v1.0.1` in each consumer's `.github/workflows/mdbook.yml` and push —
+Then bump `@v1.5.0` → `@v1.5.1` in each consumer's `.github/workflows/mdbook.yml` and push —
 a deliberate step, so upgrades are reviewed rather than automatic.
 
 ## Local preview
@@ -604,7 +604,7 @@ such a host is cosmetic. Deploy the dist to your own server and run `serve` ther
 Action does this in one step:
 
 ```yaml
-- uses: helex-solutions/mdbook@v1
+- uses: helex-solutions/mdbook@v1.5.0
   with:
     project: .
     deploy-target: deploy@docs.example.org:/srv/docs/site
