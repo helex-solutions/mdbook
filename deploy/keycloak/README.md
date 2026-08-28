@@ -33,12 +33,15 @@ All variables live in [`.env.sample`](.env.sample). The ones that matter most:
 | `MDBOOK_CLIENT_ID` | the public client mdbook uses (default `owlexicon`) |
 | `MDBOOK_ROLES` | roles to create — **quote it**, it contains spaces |
 | `MDBOOK_DEFAULT_ROLE` | role granted to everyone who can log in; empty grants nothing |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth client; a provider with no credentials is skipped, not half-created |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth client; a provider with no credentials is skipped, not half-created — so re-running without a secret never clobbers one already set |
 
 `.env` is **parsed, not sourced** — an unquoted value containing spaces would
 otherwise execute as a command, and a config file should never be able to run
 anything. Real environment variables take precedence over the file, so CI can
 supply secrets without writing one.
+
+`.env` holds secrets: it is gitignored, and worth `chmod 600`. Values must not
+carry a trailing `# comment` — the value is taken verbatim to the end of the line.
 
 ## After running
 

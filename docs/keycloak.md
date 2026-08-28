@@ -104,13 +104,16 @@ against Google), Google's discovery URL alongside the explicit endpoints, and
 three identity-provider mappers recording `sub`, `amr` and `acr` as user
 attributes — who the user is at the provider, and how they authenticated.
 
-Two steps are deliberately left to a human, because both involve a secret or an
-account this tooling should not touch:
+The **client secret comes from `.env`**, like every other credential these
+scripts use — set `GOOGLE_CLIENT_SECRET` and re-run `setup-idp.sh google`. `.env`
+is gitignored and should be `chmod 600`; a provider with no secret is skipped
+rather than half-created, so re-running without one never clobbers a value that
+is already in place.
 
-1. **Paste the Google client secret** into *Identity providers → google → Client
-   Secret* in the admin console. Keeping it out of scripts keeps it out of shell
-   history and CI logs.
-2. **Register the broker callback** in the Google Cloud console, under the OAuth
+One step stays with a human, because it needs an account this tooling should not
+touch:
+
+1. **Register the broker callback** in the Google Cloud console, under the OAuth
    client's *Authorized redirect URIs*:
 
    ```

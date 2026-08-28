@@ -4,8 +4,10 @@
 # Usage: ./setup-idp.sh google [more…]
 #        ./setup-idp.sh all
 #
-# Credentials come from .env (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, …). A
-# provider with no client id is skipped with a message rather than half-created.
+# Credentials come from .env (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, …), which
+# is gitignored — keep it chmod 600. A provider missing either value is skipped
+# with a message rather than half-created, so re-running without a secret leaves
+# an already-configured provider alone.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
