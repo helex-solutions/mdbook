@@ -45,6 +45,10 @@ Real sites built with mdbook — click a thumbnail for the live site (see
 See [`docs/termx-wiki-compatibility.md`](docs/termx-wiki-compatibility.md) for the full
 TermX Wiki → mdbook feature matrix.
 
+**Planned:** 🔐 authentication — gate a site behind OpenID Connect (Keycloak) with per-section
+rules and per-page overrides, enforced by an `mdbook serve` command. Design in
+[`docs/auth-design.md`](docs/auth-design.md).
+
 ## Quick start — a new project
 
 1. **Add a `.mdbook/` config folder** to your content repo:
