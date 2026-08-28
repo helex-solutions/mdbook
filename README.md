@@ -138,6 +138,10 @@ deterministic — `main` can move without silently redeploying your site. See th
 [releases](https://github.com/helex-solutions/mdbook/releases). Use `@main` only if you want the
 latest, unreleased changes.
 
+There is deliberately **no floating `@v1`** to track: a moving major tag would redeploy your site
+on someone else's schedule, which is the thing pinning exists to prevent. Every published tag is an
+exact version, so `@v1` resolves to nothing — upgrade by changing the pin.
+
 **To publish a new mdbook version:**
 
 ```bash
