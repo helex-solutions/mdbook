@@ -4,8 +4,10 @@
 # Usage: ./setup-idp.sh google [more…]
 #        ./setup-idp.sh all
 #
-# Credentials come from .env (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, …). A
-# provider with no client id is skipped with a message rather than half-created.
+# Credentials come from .env (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, …), which
+# is gitignored — keep it chmod 600. A provider missing either value is skipped
+# with a message rather than half-created, so re-running without a secret leaves
+# an already-configured provider alone.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
@@ -61,7 +63,16 @@ PY
     api POST "/realms/${REALM}/identity-provider/instances/${alias}/mappers" "$m" >/dev/null
     case "$API_STATUS" in
       201|204) echo "  created  mapper ${name}" ;;
-      409)     echo "  exists   mapper ${name}" ;;
+      # Keycloak answers 400 (not 409) for a duplicate identity-provider mapper,
+      # so a re-run has to check whether the name is already there before
+      # calling it an error.
+      400|409)
+        if api GET "/realms/${REALM}/identity-provider/instances/${alias}/mappers" \
+             | grep -q "\"name\"[[:space:]]*:[[:space:]]*\"${name}\""; then
+          echo "  exists   mapper ${name}"
+        else
+          echo "  WARN     mapper ${name} -> HTTP $API_STATUS"
+        fi ;;
       *)       echo "  WARN     mapper ${name} -> HTTP $API_STATUS" ;;
     esac
   done
