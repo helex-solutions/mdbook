@@ -168,6 +168,12 @@ export function createMdbookConfig(bundle) {
         txServer: bundle.txServer,
         spaceCode: bundle.spaceCode,
         pageSlugs: bundle.pageSlugs,
+        // Portal context (multi-space builds): page/asset links resolve within
+        // the page's own mount, derived from env.relativePath at render time.
+        portal: bundle.portal || false,
+        spaceMounts: bundle.spaceMounts || null,
+        spaceSlugs: bundle.spaceSlugs || null,
+        langs: bundle.langs || [],
         assetBase: bundle.assetBase || '/attachments'
         // langPrefix is applied per-locale below via separate md instances is not
         // possible in VitePress (single md), so page: links resolve to root-relative;

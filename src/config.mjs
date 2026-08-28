@@ -2,7 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import yaml from 'js-yaml'
-import { normalizeAuth } from './auth/config.mjs'
+import { normalizeAuth, normalizeAccess } from './auth/config.mjs'
 
 const CONFIG_NAMES = ['config.yml', 'config.yaml', 'config.json']
 
@@ -29,7 +29,9 @@ export function loadConfig(projectRoot, overrides = {}) {
   const mdbookDir = path.join(projectRoot, '.mdbook')
   const { data, file } = readConfigFile(mdbookDir)
 
-  const format = (data.source?.format || detectFormat(projectRoot) || 'gitbook').toLowerCase()
+  const format = (
+    data.source?.format || (data.source?.spaces ? 'termx' : detectFormat(projectRoot)) || 'gitbook'
+  ).toLowerCase()
   const sourceDefaults = SOURCE_DEFAULTS[format] || {}
 
   const siteBase = resolveBase({ explicit: overrides.base ?? data.site?.base, projectRoot })
@@ -123,6 +125,15 @@ export function applySpaceConfig(cfg, model) {
   // wiki-ssg contract extension: the space may export access defaults
   // (`ssg.auth: { access, rules }`). The repo's own auth block wins.
   if (ssg.auth && raw.auth == null) cfg.auth = normalizeAuth(ssg.auth)
+  // Portal: per-space ssg.auth arrives as mount-scoped rules from the ingester.
+  // They apply only when the portal has auth configured, and specificity
+  // (longest path) still decides between them and the repo's own rules.
+  if (cfg.auth && model.authRules?.length) {
+    const extra = model.authRules
+      .map((r) => ({ path: r.path, access: normalizeAccess(r.access) }))
+      .filter((r) => r.access)
+    cfg.auth.rules = [...cfg.auth.rules, ...extra].sort((a, b) => b.path.length - a.path.length)
+  }
   return cfg
 }
 

@@ -43,7 +43,7 @@ function findPageFile(cfg, slug) {
   return null
 }
 
-export function ingestTermx(cfg) {
+function ingestSpaceModel(cfg) {
   const spacePath = findMeta(cfg, 'space.json')
   const pagesPath = findMeta(cfg, 'pages.json')
   const space = spacePath ? readJson(spacePath) : { names: {} }
@@ -67,7 +67,10 @@ export function ingestTermx(cfg) {
   // Default lang: the space's own default wins when valid, else the configured
   // one, else the first language.
   const exportedDefault = space.defaultLang
+  // A portal build forces one default across every space; a space that lacks
+  // that language simply has no unprefixed content (strict-translation rule).
   const defaultLang =
+    cfg.source._forceDefaultLang ||
     [exportedDefault, configuredDefault].find((l) => l && langs.includes(l)) || langs[0]
   // Space-level description (localized) for the default language, if authored.
   const spaceDescription = (space.description && space.description[defaultLang]) || ''
@@ -191,4 +194,166 @@ export function ingestTermx(cfg) {
     contentFiles: contentFiles.filter((f) => activeLangs.includes(f.lang)),
     assets: [] // TermX attachments (files/<id>/…) are rewritten by the markdown plugin
   }
+}
+
+// ---------------------------------------------------------------- portal ----
+//
+// Multi-space portal (OWLEXICON.01 §4.5): one site, many wiki-ssg exports.
+//   source:
+//     format: termx
+//     spaces:
+//       handbook: docs/handbook    # dir with space.json / pages.json / pages/…
+//       api: docs/api
+// Each space mounts under /<key>/ (its own sidebar; every locale under
+// /<lang>/<key>/), the nav gets one entry per space, and a portal home page
+// linking the spaces is generated per locale. Attachments are namespaced per
+// mount so page ids from different TermX instances cannot collide.
+
+const MOUNT_RE = /^[A-Za-z0-9][\w-]*$/
+
+// Prefix an internal link with the mount, keeping any locale prefix in front:
+// /slug -> /<mount>/slug, /<lang>/slug -> /<lang>/<mount>/slug.
+function mountLink(link, mount, lang, portalDefault) {
+  if (typeof link !== 'string' || !link.startsWith('/')) return link
+  if (lang === portalDefault) return `/${mount}${link}`.replace(/\/$/, '') || `/${mount}/`
+  const re = new RegExp(`^/${lang}(/|$)`)
+  return re.test(link) ? link.replace(re, `/${lang}/${mount}$1`) : `/${mount}${link}`
+}
+
+function mountItems(items, mount, lang, portalDefault) {
+  return (items || []).map((item) => {
+    const out = { ...item }
+    if (out.link) out.link = mountLink(out.link, mount, lang, portalDefault)
+    if (Array.isArray(out.items)) out.items = mountItems(out.items, mount, lang, portalDefault)
+    return out
+  })
+}
+
+function ingestPortal(cfg) {
+  const portalDefault = cfg.site.lang || 'en'
+  const spaces = []
+  for (const [mount, dir] of Object.entries(cfg.source.spaces)) {
+    if (!MOUNT_RE.test(mount)) throw new Error(`source.spaces: invalid mount name "${mount}"`)
+    const shim = {
+      ...cfg,
+      source: {
+        ...cfg.source,
+        spaces: null,
+        meta: dir,
+        pages: `${dir}/pages`,
+        _forceDefaultLang: portalDefault
+      }
+    }
+    const model = ingestSpaceModel(shim)
+    spaces.push({ mount, dir, model })
+  }
+
+  // Locales: the union, portal default first.
+  const langs = [portalDefault, ...new Set(spaces.flatMap((s) => s.model.langs))].filter(
+    (l, i, a) => a.indexOf(l) === i
+  )
+
+  const contentFiles = []
+  const sidebars = {}
+  const navs = {}
+  const spaceNames = {}
+  const folderLabels = {}
+  const spaceMounts = {}
+  const spaceSlugs = {}
+  const authRules = []
+
+  for (const { mount, model } of spaces) {
+    const titleFor = (lang) => model.spaceNames?.[lang] || model.title
+    if (model.spaceCode) spaceMounts[model.spaceCode] = mount
+    spaceSlugs[mount] = [
+      ...new Set(
+        model.contentFiles
+          .filter((f) => f.dest?.endsWith('.md') && !f.redirect)
+          .map((f) => f.dest.replace(/\.md$/, '').split('/').pop())
+          .filter((s) => s !== 'index')
+      )
+    ]
+    for (const f of model.contentFiles) {
+      const dest =
+        f.lang === portalDefault
+          ? `${mount}/${f.dest}`
+          : f.dest.replace(new RegExp(`^${f.lang}/`), `${f.lang}/${mount}/`)
+      const out = { ...f, dest, mount }
+      if (f.redirect) out.redirect = mountLink(f.redirect, mount, f.lang, portalDefault)
+      contentFiles.push(out)
+    }
+    for (const lang of model.langs) {
+      const key = lang === portalDefault ? `/${mount}/` : `/${lang}/${mount}/`
+      ;(sidebars[lang] ||= {})[key] = mountItems(model.sidebars[lang], mount, lang, portalDefault)
+      ;(navs[lang] ||= []).push({ text: titleFor(lang), link: key })
+      folderLabels[lang === portalDefault ? mount : `${lang}/${mount}`] = titleFor(lang)
+    }
+    for (const [lang, name] of Object.entries(model.spaceNames || {})) {
+      spaceNames[lang] ||= name // locale labels: first space naming the locale wins
+    }
+    // Space-exported access defaults (ssg.auth) become portal rules scoped to
+    // the mount; the portal repo's own auth config still wins on specificity.
+    const sa = model.ssg?.auth
+    if (sa) {
+      if (sa.access != null) authRules.push({ path: `${mount}/**`, access: sa.access })
+      for (const r of sa.rules || []) {
+        if (r?.path && r?.access != null) authRules.push({ path: `${mount}/${r.path}`, access: r.access })
+      }
+    }
+  }
+
+  // Portal home per locale: the space directory. Plain generated markdown —
+  // it goes through the normal staging pipeline (SEO, search, hardening).
+  const portalTitle = cfg.site.title || 'Documentation'
+  for (const lang of langs) {
+    const withContent = spaces.filter((s) => s.model.langs.includes(lang))
+    if (lang !== portalDefault && !withContent.length) continue
+    const lines = [`# ${portalTitle}`, '']
+    for (const { mount, model } of withContent) {
+      const key = lang === portalDefault ? `/${mount}/` : `/${lang}/${mount}/`
+      const name = model.spaceNames?.[lang] || model.title
+      lines.push(`- [**${name}**](${key})${model.description ? ` — ${model.description}` : ''}`)
+    }
+    lines.push('', '{.links-list}', '')
+    contentFiles.push({
+      dest: lang === portalDefault ? 'index.md' : `${lang}/index.md`,
+      lang,
+      title: portalTitle,
+      content: lines.join('\n')
+    })
+  }
+
+  return {
+    portal: true,
+    title: portalTitle,
+    web: cfg.site.web || spaces.map((s) => s.model.web).find(Boolean) || null,
+    spaceCode: null,
+    description: cfg.site.description || '',
+    siteUrl: null,
+    ssg: null, // portal theming is owned by the repo config, not by any one space
+    langs,
+    defaultLang: portalDefault,
+    home: 'index.md',
+    sidebars,
+    navs,
+    spaceNames,
+    folderLabels,
+    spaceMounts,
+    spaceSlugs,
+    authRules,
+    contentFiles,
+    attachmentDirs: spaces
+      .map(({ mount, dir }) => ({ mount, srcDir: path.join(cfg.projectRoot, dir, 'attachments') }))
+      .filter((a) => fs.existsSync(a.srcDir)),
+    resourceDirs: spaces.map(({ dir }) =>
+      path.join(cfg.projectRoot, dir, 'resources', 'structure-definition')
+    ),
+    assets: []
+  }
+}
+
+export function ingestTermx(cfg) {
+  const spaces = cfg.source.spaces
+  if (spaces && Object.keys(spaces).length) return ingestPortal(cfg)
+  return ingestSpaceModel(cfg)
 }
