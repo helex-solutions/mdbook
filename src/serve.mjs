@@ -275,6 +275,13 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
         code_challenge: challenge,
         code_challenge_method: 'S256'
       })
+      // Only after a deliberate sign-out. Arriving with a live SSO session from
+      // another application still signs the reader straight in, which is the
+      // point of sharing the realm.
+      if (parseCookies(req)['mdbook-reauth']) {
+        q.set('prompt', 'login')
+        setCookie(res, 'mdbook-reauth', '', { path: base, clear: true })
+      }
       return send(res, 302, '', 'text/plain', { Location: `${doc.authorization_endpoint}?${q}` })
     }
 
@@ -336,10 +343,18 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
 
     if (url.pathname === '/auth/logout') {
       setCookie(res, 'mdbook-session', '', { path: base, clear: true })
+      // A local sign-out leaves the realm session alone, so the next login
+      // would complete silently as the same person — signing out and back in
+      // to switch accounts would be impossible. Remember that this sign-out was
+      // deliberate and ask the provider for a fresh login next time.
+      if (auth.logout === 'local' && auth.reauthAfterLogout) {
+        setCookie(res, 'mdbook-reauth', '1', { path: base, maxAge: 900, secure })
+      }
       const landing = `${origin}${base}auth/signed-out`.replace(/([^:])\/\//g, '$1/')
-      // Local by default: this site's session ends, the realm session does not.
-      // Ending the shared SSO session would sign the reader out of every other
-      // app on that realm, which is rarely what "sign out of the docs" means.
+      // Global by default: end the realm session, so signing out of the docs
+      // signs the reader out of every application sharing that realm — what
+      // "sign out" is normally taken to mean. logout: local keeps it to this
+      // site when sibling applications must not be disturbed.
       const location =
         auth.logout === 'idp' && doc.end_session_endpoint
           ? `${doc.end_session_endpoint}?${new URLSearchParams({ client_id: auth.clientId, post_logout_redirect_uri: landing })}`

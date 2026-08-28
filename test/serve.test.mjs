@@ -266,7 +266,7 @@ test('generated pages under /auth/ are served, not swallowed by the endpoints', 
   }
 })
 
-test('sign-out is local by default and does not need the provider', async () => {
+test('logout: local keeps the realm session and needs no provider', async () => {
   const dist = makeDist()
   const codec = createSessionCodec('s')
   const base = {
@@ -293,6 +293,56 @@ test('sign-out is local by default and does not need the provider', async () => 
     assert.equal((await get(local.port, '/internal/secret')).status, 302)
   } finally {
     local.server.close()
+  }
+})
+
+test('a deliberate sign-out forces a fresh login next time', async () => {
+  const jose = await import('jose')
+  const { publicKey, privateKey } = await jose.generateKeyPair('RS256')
+  const jwk = await jose.exportJWK(publicKey)
+  jwk.kid = 'idp1'; jwk.alg = 'RS256'
+  let issuer
+  const idp = http.createServer((req, res) => {
+    if (req.url === '/.well-known/openid-configuration') {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({
+        issuer,
+        authorization_endpoint: `${issuer}/authorize`,
+        token_endpoint: `${issuer}/token`,
+        jwks_uri: `${issuer}/jwks`,
+        end_session_endpoint: `${issuer}/logout`
+      }))
+    } else { res.writeHead(404); res.end() }
+  })
+  const idpPort = await new Promise((r) => idp.listen(0, '127.0.0.1', () => r(idp.address().port)))
+  issuer = `http://127.0.0.1:${idpPort}`
+
+  const dist = makeDist()
+  const codec = createSessionCodec('s')
+  const auth = {
+    issuer, clientId: 'owlexicon', scopes: ['openid'], roleClaims: 'roles',
+    access: 'public', logout: 'local', reauthAfterLogout: true,
+    session: { maxAge: 3600 }, trustProxy: null
+  }
+  const { server, port } = await serve(createHandler({ dist, acl: ACL, auth, codec, quiet: true }))
+  try {
+    // A first login carries no prompt: arriving with a live SSO session from
+    // another application should sign the reader straight in.
+    const first = await get(port, '/auth/login')
+    assert.equal(new URL(first.headers.get('location')).searchParams.get('prompt'), null)
+
+    // Sign out, then follow the marker it leaves behind.
+    const out = await get(port, '/auth/logout')
+    const reauth = [].concat(out.headers.getSetCookie()).find((c) => c.startsWith('mdbook-reauth='))
+    assert.ok(reauth, 'sign-out must record that it was deliberate')
+
+    const again = await get(port, '/auth/login', { cookie: reauth.split(';')[0] })
+    const url = new URL(again.headers.get('location'))
+    assert.equal(url.searchParams.get('prompt'), 'login')
+    // …and the marker is spent, so the login after that is silent again.
+    assert.ok([].concat(again.headers.getSetCookie()).some((c) => /^mdbook-reauth=;/.test(c)))
+  } finally {
+    server.close(); idp.close()
   }
 })
 
@@ -365,6 +415,8 @@ test('OIDC verify mode: full login roundtrip against a mock IdP', async () => {
     roleClaims: 'realm_access.roles',
     access: 'public',
     publicUrl: null,
+    logout: 'idp', // what normalizeAuth produces by default
+    reauthAfterLogout: true,
     session: { maxAge: 3600 },
     trustProxy: null,
     issuers: null
@@ -401,26 +453,26 @@ test('OIDC verify mode: full login roundtrip against a mock IdP', async () => {
     // 5. State mismatch is rejected.
     const badCb = await get(port, `/auth/callback?code=abc123&state=WRONG`, { cookie: pkceCookie })
     assert.equal(badCb.status, 400)
-    // 6. Logout clears the session and, by default, stays local — the realm
-    //    session is left alone so other apps on it are unaffected.
+    // 6. Logout ends the realm session by default (RP-initiated), so the
+    //    reader is signed out of every application sharing that realm.
     const out = await get(port, '/auth/logout', { cookie })
     assert.equal(out.status, 302)
-    assert.match(out.headers.get('location'), /\/auth\/signed-out$/)
+    const outUrl0 = new URL(out.headers.get('location'))
+    assert.equal(outUrl0.origin, issuer)
+    assert.equal(outUrl0.pathname, '/logout')
     assert.equal((await get(port, '/internal/secret', { cookie })).status, 200) // cookie itself still valid…
     assert.ok([].concat(out.headers.getSetCookie()).some((c) => /^mdbook-session=;/.test(c)))
 
-    // 7. logout: 'idp' opts in to RP-initiated logout at the provider.
-    const rp = await serve(createHandler({ dist, base: '/', acl: ACL, auth: { ...auth, logout: 'idp' }, codec, quiet: true }))
+    assert.equal(outUrl0.searchParams.get('client_id'), 'owlexicon')
+    assert.match(outUrl0.searchParams.get('post_logout_redirect_uri'), /\/auth\/signed-out$/)
+
+    // 7. logout: 'local' opts out, keeping the realm session alive.
+    const lo = await serve(createHandler({ dist, base: '/', acl: ACL, auth: { ...auth, logout: 'local' }, codec, quiet: true }))
     try {
-      const res = await get(rp.port, '/auth/logout', { cookie })
-      assert.equal(res.status, 302)
-      const outUrl = new URL(res.headers.get('location'))
-      assert.equal(outUrl.origin, issuer)
-      assert.equal(outUrl.pathname, '/logout')
-      assert.equal(outUrl.searchParams.get('client_id'), 'owlexicon')
-      assert.match(outUrl.searchParams.get('post_logout_redirect_uri'), /\/auth\/signed-out$/)
+      const res = await get(lo.port, '/auth/logout', { cookie })
+      assert.match(res.headers.get('location'), /\/auth\/signed-out$/)
     } finally {
-      rp.server.close()
+      lo.server.close()
     }
   } finally {
     server.close()

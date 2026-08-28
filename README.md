@@ -571,9 +571,11 @@ command:
 mdbook serve --project . --port 8080        # behind nginx (TLS); --build to build first
 ```
 
-Signing out drops the site's own session and leaves the realm session alone, so a reader is not
-logged out of every other application sharing that identity provider; `auth.logout: idp` opts in
-to ending the realm session too.
+Signing out ends the session at the identity provider, so the reader is signed out of every
+application sharing that realm — what sign-out is normally taken to mean. `auth.logout: local`
+keeps it to this site instead, for a deployment whose sibling applications must not be disturbed;
+that mode then prompts for a fresh login on the next sign-in, so signing out and back in doesn't
+silently return the same person.
 
 `serve` performs the OAuth code + PKCE flow server-side and holds the session in a signed
 HttpOnly cookie — no token ever reaches the browser, and a plain `<img>` can load a protected
