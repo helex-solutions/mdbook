@@ -589,6 +589,10 @@ Secrets and identity config come from the environment when omitted from config �
 `AUTH_OIDC_AUTHORITY`, `AUTH_OIDC_CLIENT_ID`, `AUTH_OIDC_CLIENT_SECRET`, `AUTH_SESSION_SECRET`,
 `AUTH_ROLE_CLAIMS`, and `GUEST_DISABLED=true` to require login for the whole site.
 
+Setting up the provider — realm, public client, the roles claim mdbook reads, federated login
+(Google) and how to verify enforcement without a browser — is in
+[`docs/keycloak.md`](docs/keycloak.md).
+
 A gated site **cannot** live on GitHub Pages or any dumb static host — client-side gating on
 such a host is cosmetic. Deploy the dist to your own server and run `serve` there; the GitHub
 Action does this in one step:

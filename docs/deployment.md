@@ -32,8 +32,10 @@ docker run --rm -v /srv/docs/mysite:/site mdbook:latest build
 ```
 
 Auth configuration is read from config or the environment (`AUTH_OIDC_AUTHORITY`,
-`AUTH_OIDC_CLIENT_ID`, `AUTH_SESSION_SECRET`, …) — see
-[`auth-design.md`](auth-design.md).
+`AUTH_OIDC_CLIENT_ID`, `AUTH_SESSION_SECRET`, …) — see [`auth-design.md`](auth-design.md)
+for the model and [`keycloak.md`](keycloak.md) for provider setup. Keep
+`AUTH_SESSION_SECRET` in an env file readable only by root (`chmod 600`), not in the
+compose file.
 
 ## nginx
 
@@ -80,7 +82,13 @@ A content-only update needs no restart: `serve` reads files per request.
 ## Reference deployment
 
 `https://tx.helex.dev/mdbook/` runs the [`demo/`](../demo) project this way — image
-built on the host, content in `/root/mdbook/site`, container on `127.0.0.1:8510`,
-nginx location as above. Note that host's Docker is the **snap** package, which
-cannot read build contexts or bind-mount paths outside `$HOME` — hence `/root/...`
-rather than `/opt` or `/srv`.
+built on the host, content in `/root/mdbook/site` (owned by uid 10001), container
+`mdbook-demo` on `127.0.0.1:8510` with `--env-file /root/mdbook/mdbook.env`, and the
+nginx location above in `tx.conf`.
+
+It authenticates against the `mdbook` realm on `https://sso.helex.dev` (client
+`owlexicon`, see [`keycloak.md`](keycloak.md)): the site is public, `internal/**`
+requires `editor` or `admin`.
+
+Note that host's Docker is the **snap** package, which cannot read build contexts or
+bind-mount paths outside `$HOME` — hence `/root/...` rather than `/opt` or `/srv`.
