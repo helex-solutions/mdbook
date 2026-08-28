@@ -9,6 +9,7 @@
 import { defineComponent, ref, onMounted, watch, h, nextTick } from 'vue'
 import { useData, useRoute, withBase } from 'vitepress'
 import { requirementFor, isAllowed } from '../auth/acl.mjs'
+import { returnToFor } from '../auth/nav.mjs'
 
 // The manifest is fixed for a deployment, so it is fetched once. The session is
 // not: it changes on sign-in and sign-out, including in another tab, so it is
@@ -95,17 +96,23 @@ export default defineComponent({
     return () => {
       const s = state.value
       if (!s) return null
-      const here = typeof location !== 'undefined' ? location.pathname + location.search : '/'
+      // `target` makes VitePress's router leave the click alone: /auth/* are
+      // server endpoints, not pages, so a client-side navigation would render
+      // the SPA's 404 and never reach the server.
+      const nav = { target: '_self' }
       if (!s.session) {
+        const returnTo = encodeURIComponent(
+          returnToFor(withBase('/'), typeof location !== 'undefined' ? location : null)
+        )
         return h(
           'a',
-          { class: 'mdbook-auth mdbook-auth-signin', href: withBase(`/auth/login?returnTo=${encodeURIComponent(here)}`) },
+          { ...nav, class: 'mdbook-auth mdbook-auth-signin', href: withBase(`/auth/login?returnTo=${returnTo}`) },
           'Sign in'
         )
       }
       return h('span', { class: 'mdbook-auth' }, [
         h('span', { class: 'mdbook-auth-user', title: (s.session.roles || []).join(', ') }, s.session.user?.name || ''),
-        h('a', { class: 'mdbook-auth-signout', href: withBase('/auth/logout') }, 'Sign out')
+        h('a', { ...nav, class: 'mdbook-auth-signout', href: withBase('/auth/logout') }, 'Sign out')
       ])
     }
   }
