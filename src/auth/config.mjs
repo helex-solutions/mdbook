@@ -84,14 +84,16 @@ export function normalizeAuth(data, env = process.env) {
     roleClaims: String(data.roleClaims || data['role-claims'] || env.AUTH_ROLE_CLAIMS || 'roles'),
     access,
     rules,
-    // Sign-out scope. 'local' (default) drops this site's session only: signing
-    // out of the docs should not end the SSO session shared with every other
-    // app on the realm. 'idp' additionally performs RP-initiated logout at the
-    // provider, ending that shared session.
-    logout: (data.logout || 'local').toLowerCase() === 'idp' ? 'idp' : 'local',
-    // After a local sign-out, ask the provider for a fresh login next time, so
-    // "sign out" is not silently undone by the still-live realm session. Set
-    // false to let the next login complete silently as the same person.
+    // Sign-out scope. 'idp' (default) performs RP-initiated logout: the realm
+    // session ends, so the reader is signed out of every application sharing
+    // it — which is what people mean by "sign out". 'local' drops this site's
+    // session only, leaving sibling applications untouched; the cost is that
+    // the realm session survives, so see reauthAfterLogout.
+    logout: (data.logout || 'idp').toLowerCase() === 'local' ? 'local' : 'idp',
+    // Only relevant to logout: local. The surviving realm session would sign
+    // the next login straight back in as the same person, so a deliberate
+    // sign-out asks the provider for a fresh login next time. Set false to let
+    // that next login complete silently.
     reauthAfterLogout: (data.reauthAfterLogout ?? data['reauth-after-logout']) !== false,
     // Absolute public origin of the served site (scheme://host[:port]). Usually
     // derived per request from X-Forwarded-Proto/Host; set it when the proxy

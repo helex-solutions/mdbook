@@ -351,9 +351,10 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
         setCookie(res, 'mdbook-reauth', '1', { path: base, maxAge: 900, secure })
       }
       const landing = `${origin}${base}auth/signed-out`.replace(/([^:])\/\//g, '$1/')
-      // Local by default: this site's session ends, the realm session does not.
-      // Ending the shared SSO session would sign the reader out of every other
-      // app on that realm, which is rarely what "sign out of the docs" means.
+      // Global by default: end the realm session, so signing out of the docs
+      // signs the reader out of every application sharing that realm — what
+      // "sign out" is normally taken to mean. logout: local keeps it to this
+      // site when sibling applications must not be disturbed.
       const location =
         auth.logout === 'idp' && doc.end_session_endpoint
           ? `${doc.end_session_endpoint}?${new URLSearchParams({ client_id: auth.clientId, post_logout_redirect_uri: landing })}`

@@ -266,7 +266,7 @@ test('generated pages under /auth/ are served, not swallowed by the endpoints', 
   }
 })
 
-test('sign-out is local by default and does not need the provider', async () => {
+test('logout: local keeps the realm session and needs no provider', async () => {
   const dist = makeDist()
   const codec = createSessionCodec('s')
   const base = {
@@ -415,6 +415,8 @@ test('OIDC verify mode: full login roundtrip against a mock IdP', async () => {
     roleClaims: 'realm_access.roles',
     access: 'public',
     publicUrl: null,
+    logout: 'idp', // what normalizeAuth produces by default
+    reauthAfterLogout: true,
     session: { maxAge: 3600 },
     trustProxy: null,
     issuers: null
@@ -451,26 +453,26 @@ test('OIDC verify mode: full login roundtrip against a mock IdP', async () => {
     // 5. State mismatch is rejected.
     const badCb = await get(port, `/auth/callback?code=abc123&state=WRONG`, { cookie: pkceCookie })
     assert.equal(badCb.status, 400)
-    // 6. Logout clears the session and, by default, stays local — the realm
-    //    session is left alone so other apps on it are unaffected.
+    // 6. Logout ends the realm session by default (RP-initiated), so the
+    //    reader is signed out of every application sharing that realm.
     const out = await get(port, '/auth/logout', { cookie })
     assert.equal(out.status, 302)
-    assert.match(out.headers.get('location'), /\/auth\/signed-out$/)
+    const outUrl0 = new URL(out.headers.get('location'))
+    assert.equal(outUrl0.origin, issuer)
+    assert.equal(outUrl0.pathname, '/logout')
     assert.equal((await get(port, '/internal/secret', { cookie })).status, 200) // cookie itself still valid…
     assert.ok([].concat(out.headers.getSetCookie()).some((c) => /^mdbook-session=;/.test(c)))
 
-    // 7. logout: 'idp' opts in to RP-initiated logout at the provider.
-    const rp = await serve(createHandler({ dist, base: '/', acl: ACL, auth: { ...auth, logout: 'idp' }, codec, quiet: true }))
+    assert.equal(outUrl0.searchParams.get('client_id'), 'owlexicon')
+    assert.match(outUrl0.searchParams.get('post_logout_redirect_uri'), /\/auth\/signed-out$/)
+
+    // 7. logout: 'local' opts out, keeping the realm session alive.
+    const lo = await serve(createHandler({ dist, base: '/', acl: ACL, auth: { ...auth, logout: 'local' }, codec, quiet: true }))
     try {
-      const res = await get(rp.port, '/auth/logout', { cookie })
-      assert.equal(res.status, 302)
-      const outUrl = new URL(res.headers.get('location'))
-      assert.equal(outUrl.origin, issuer)
-      assert.equal(outUrl.pathname, '/logout')
-      assert.equal(outUrl.searchParams.get('client_id'), 'owlexicon')
-      assert.match(outUrl.searchParams.get('post_logout_redirect_uri'), /\/auth\/signed-out$/)
+      const res = await get(lo.port, '/auth/logout', { cookie })
+      assert.match(res.headers.get('location'), /\/auth\/signed-out$/)
     } finally {
-      rp.server.close()
+      lo.server.close()
     }
   } finally {
     server.close()

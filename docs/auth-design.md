@@ -38,8 +38,8 @@ auth:
   clientId: owlexicon
   # clientSecret: ${AUTH_OIDC_CLIENT_SECRET}  # optional — confidential client; env-resolved
   scopes: [openid, profile]
-  logout: local                           # local (default) | idp — see `mdbook serve`
-  reauthAfterLogout: true                 # prompt for a fresh login after a deliberate sign-out
+  logout: idp                             # idp (default) | local — see `mdbook serve`
+  reauthAfterLogout: true                 # logout: local only — prompt after a deliberate sign-out
   roleClaims: roles                       # dotted paths, comma-separated fallbacks
                                           # e.g. "realm_access.roles,resource_access.owlexicon.roles"
   access: public                          # site default: public | authenticated | [role, …]
@@ -143,19 +143,20 @@ entry point for any site with protected content.
   - `GET /auth/login?returnTo=…` — starts the redirect;
   - `GET /auth/callback` — server-side code exchange; sets the session; redirects to `returnTo`;
   - `GET /auth/logout` — drops this site's session and lands on the generated
-    `signed-out` page. **Local by default**: ending the shared realm session
-    would sign the reader out of every other application on that realm, which is
-    rarely what "sign out of the docs" means. `auth.logout: idp` opts in to
-    RP-initiated logout via `end_session_endpoint`. A local sign-out never
-    contacts the provider, so it still works when the provider is down.
+    `signed-out` page. **Global by default** (`auth.logout: idp`): RP-initiated
+    logout via `end_session_endpoint` ends the realm session, so the reader is
+    signed out of every application sharing it — what "sign out" is normally
+    taken to mean.
 
-    Because the realm session survives a local sign-out, the *next* login would
-    otherwise complete silently as the same person — making "sign out, sign in
-    as someone else" impossible. So a deliberate sign-out leaves a short-lived
-    marker, and the next login asks the provider for a fresh one
-    (`prompt=login`). Arriving with a live session from another application is
-    untouched: that path stays silent, which is the point of sharing a realm.
-    `auth.reauthAfterLogout: false` turns the prompt off;
+    `auth.logout: local` keeps it to this site, for a deployment whose sibling
+    applications must not be disturbed. That mode never contacts the provider,
+    so it still works when the provider is down — but the realm session
+    survives, and the next login would complete silently as the same person,
+    making "sign out, then sign in as someone else" impossible. So a deliberate
+    local sign-out leaves a short-lived marker and the next login asks for a
+    fresh one (`prompt=login`); arriving with a live session from another
+    application stays silent, which is the point of sharing a realm.
+    `auth.reauthAfterLogout: false` turns that prompt off;
   - `GET /auth/session` — `{ user, roles }` JSON for the theme; `401` when anonymous.
 - Session: **signed HttpOnly cookie** carrying subject, display name, roles, expiry. No token in
   browser storage, and no `?token=` query parameters on asset URLs — the cookie is what lets a
