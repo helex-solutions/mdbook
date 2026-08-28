@@ -41,13 +41,11 @@ Real sites built with mdbook — click a thumbnail for the live site (see
 - 💬 **Comments** — optional [Giscus](https://giscus.app) (GitHub Discussions) box per page (see [Comments](#comments-github-discussions))
 - 🖥️ **Presentation mode** — a fullscreen, chrome-free view with prev/next controls for showing pages to an audience (see [Presentation mode](#presentation-mode))
 - 🔍 **Zoom** — a −/+ control in the nav bar scales the article (80–200%, remembered per browser); pair it with `theme.wide` for dense reference tables
+- 🔐 **Authentication** — gate the site (or sections of it, or single pages) behind OpenID Connect (Keycloak), enforced server-side by `mdbook serve` (see [Authentication](#authentication))
 
 See [`docs/termx-wiki-compatibility.md`](docs/termx-wiki-compatibility.md) for the full
 TermX Wiki → mdbook feature matrix.
 
-**Planned:** 🔐 authentication — gate a site behind OpenID Connect (Keycloak) with per-section
-rules and per-page overrides, enforced by an `mdbook serve` command. Design in
-[`docs/auth-design.md`](docs/auth-design.md).
 
 ## Quick start — a new project
 
@@ -127,6 +125,7 @@ a deliberate step, so upgrades are reviewed rather than automatic.
 ```bash
 npx github:helex-solutions/mdbook build --project .   # build to .mdbook/dist
 npx github:helex-solutions/mdbook dev   --project .   # live-reload dev server
+npx github:helex-solutions/mdbook serve --project .   # production server (auth-enforcing)
 ```
 
 (`npx` clones the public repo and runs it; no npm publish needed. Requires Node ≥ 20.)
@@ -152,6 +151,15 @@ source:
     - _templates               #   folder name -> the whole subtree
     - agents/notes             #   path -> matches from the content root
     - "*.draft.md"             #   `*` within a segment, `**` across segments
+
+# Site authentication — see the Authentication section below.
+auth:
+  issuer: https://sso.example.org/realms/htx   # OIDC issuer (or env AUTH_OIDC_AUTHORITY)
+  clientId: owlexicon                          # public or confidential client
+  access: public                # site default: public | authenticated | [role, …]
+  rules:                        # per-section access; a page overrides via `access:` frontmatter
+    - path: internal/**
+      access: [editor, admin]
 
 # API reference — see the OpenAPI section below.
 openapi:
@@ -457,6 +465,64 @@ held in `sessionStorage` (gone when the tab closes), never placed in a URL.
 
 Set `tryIt: false` to render the reference documentation without any console — useful when
 the API is internal and only the docs are public.
+
+## Authentication
+
+Gate the site — or sections of it, or single pages — behind OpenID Connect. Keycloak is the
+primary target, but any OIDC provider with a discovery document works. Full design (threat
+model, environment mapping, deployment recipes) in [`docs/auth-design.md`](docs/auth-design.md).
+
+```yaml
+auth:
+  issuer: https://sso.example.org/realms/htx
+  clientId: owlexicon
+  access: public                 # site default: public | authenticated | [role, …]
+  rules:                         # per-section rules; longest path match wins
+    - path: internal/**
+      access: [editor, admin]
+```
+
+A page overrides its section with frontmatter — `access: public | authenticated | [role, …]` —
+Confluence-style. The build resolves everything into an `acl.json` manifest next to the dist and
+keeps protected pages **out of the search index**; enforcement is the job of the **`serve`**
+command:
+
+```bash
+mdbook serve --project . --port 8080        # behind nginx (TLS); --build to build first
+```
+
+`serve` performs the OAuth code + PKCE flow server-side and holds the session in a signed
+HttpOnly cookie — no token ever reaches the browser, and a plain `<img>` can load a protected
+attachment. Unauthenticated visitors are redirected to sign in; authenticated ones lacking the
+role get a 403 page. Bearer JWTs are accepted too, verified against the configured issuer(s) —
+`auth.issuers` lets one site accept several IdPs. Behind a gateway that already authenticates
+(oauth2-proxy, Cloudflare Access), skip verification and trust its headers instead:
+
+```yaml
+auth:
+  trustProxy:
+    userHeader: X-Auth-Request-User
+    rolesHeader: X-Auth-Request-Groups
+```
+
+Secrets and identity config come from the environment when omitted from config —
+`AUTH_OIDC_AUTHORITY`, `AUTH_OIDC_CLIENT_ID`, `AUTH_OIDC_CLIENT_SECRET`, `AUTH_SESSION_SECRET`,
+`AUTH_ROLE_CLAIMS`, and `GUEST_DISABLED=true` to require login for the whole site.
+
+A gated site **cannot** live on GitHub Pages or any dumb static host — client-side gating on
+such a host is cosmetic. Deploy the dist to your own server and run `serve` there; the GitHub
+Action does this in one step:
+
+```yaml
+- uses: helex-solutions/mdbook@v1
+  with:
+    project: .
+    deploy-target: deploy@docs.example.org:/srv/docs/site
+    deploy-key: ${{ secrets.DOCS_DEPLOY_KEY }}
+    deploy-post: sudo systemctl restart mdbook-docs   # only when acl/config changed
+```
+
+Sites without an `auth:` block build and deploy exactly as before, anywhere.
 
 ## Comments (GitHub Discussions)
 

@@ -82,11 +82,14 @@ export function ingestTermx(cfg) {
   // with translated descendants become link-less group headers so the tree
   // stays navigable. Returns the number of real (linked) pages found.
   const pageCount = {}
-  function buildSidebar(nodes, lang) {
+  function buildSidebar(nodes, lang, inheritedAccess = null) {
     const items = []
     for (const node of nodes || []) {
+      // Optional per-node access (wiki-ssg contract extension): children
+      // inherit unless they carry their own. Flattened into acl.json at stage.
+      const access = node.access ?? inheritedAccess
       const content = (node.contents || []).find((c) => c.lang === lang)
-      const children = buildSidebar(node.children, lang)
+      const children = buildSidebar(node.children, lang, access)
       if (content) {
         const src = findPageFile(cfg, content.slug)
         const dest = destFor(content.slug, lang)
@@ -95,7 +98,8 @@ export function ingestTermx(cfg) {
           contentFiles.push({
             src, dest, lang, title: content.name?.trim() || content.slug, code: node.code,
             description: content.description || null,
-            tags: node.tags?.length ? node.tags : null // page-level; -> <meta keywords>
+            tags: node.tags?.length ? node.tags : null, // page-level; -> <meta keywords>
+            access: access || null // page/inherited access -> acl.json
           })
           pageCount[lang] = (pageCount[lang] || 0) + 1
         }

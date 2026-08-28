@@ -19,6 +19,8 @@ import { expandStructureDefinitions } from './ingest/structure-definition.mjs'
 import { expandConceptMatrices } from './ingest/concept-matrix.mjs'
 import { loadOpenapiSpecs, authFromSchemes } from './ingest/openapi.mjs'
 import { expandOpenapi } from './ingest/openapi-render.mjs'
+import { resolveAccess, readAccessFrontmatter, buildAclManifest } from './auth/acl.mjs'
+import { normalizeAccess } from './auth/config.mjs'
 
 const MDBOOK_SRC = path.dirname(fileURLToPath(import.meta.url)) // .../mdbook/src
 
@@ -92,6 +94,9 @@ function makeBundle(cfg, model) {
         }
       : null,
     web,
+    // Client hint only — issuer/client/secrets never enter the bundle; the
+    // theme talks to the serve endpoints (/auth/session) and acl.json.
+    auth: cfg.auth ? { enabled: true } : null,
     txServer: cfg.txServer,
     spaceCode: model.spaceCode || null,
     pageSlugs,
@@ -140,6 +145,15 @@ function stageContent(cfg, model, openapiSpecs = {}) {
   // Copy content files, running markdown through the transform pipeline.
   const isTermx = cfg.source.format === 'termx'
   const isSearchExcluded = makeExcluder(cfg.searchExclude || [])
+  // Site authentication: resolve each page's effective access (frontmatter /
+  // pages.json override -> config rule -> site default) while staging, so the
+  // manifest, the search index and the page agree. See docs/auth-design.md.
+  const aclEntries = []
+  const aclAssets = []
+  const aclOpts = cfg.auth
+    ? { rules: cfg.auth.rules, siteDefault: cfg.auth.access }
+    : null
+  const isProtected = (a) => a && a !== 'public'
   const docIndex = buildDocIndex(model.contentFiles)
   // Which staged folders actually have an index page — a breadcrumb for a folder
   // without one is shown as plain text rather than a link to a 404.
@@ -162,6 +176,18 @@ function stageContent(cfg, model, openapiSpecs = {}) {
     }
     if (f.src.endsWith('.md')) {
       let text = fs.readFileSync(f.src, 'utf8')
+      let access = null
+      if (aclOpts) {
+        const pageAccess = normalizeAccess(f.access) || readAccessFrontmatter(text)
+        access = resolveAccess(f.dest, { pageAccess, ...aclOpts })
+        if (isProtected(access)) {
+          aclEntries.push({ dest: f.dest, access })
+          // Attachments referenced by a protected page are protected with it.
+          for (const m of text.matchAll(/(?:files|attachments)\/([A-Za-z0-9_-]+)\//g)) {
+            aclAssets.push({ prefix: `/attachments/${m[1]}/`, access })
+          }
+        }
+      }
       if (isTermx) {
         text = sanitizeTermxMarkdown(text)
         text = expandStructureDefinitions(text, sdDirs) // {{def:…}} -> <tx-sd-view>
@@ -186,6 +212,8 @@ function stageContent(cfg, model, openapiSpecs = {}) {
       if (f.tags?.length) extra.keywords = f.tags
       // Keep hand-picked pages out of the search index (they stay published).
       if (isSearchExcluded(f.dest)) extra.search = false
+      // A protected page must never reach the public search-index chunk.
+      if (isProtected(access)) extra.search = false
       // Where am I / what else covers this — resolved at build time so the theme
       // only has to render, and pages carry no extra client-side lookup cost.
       const crumbs = breadcrumbsFor(f.dest, model.folderLabels, destSet, cfg.site.base)
@@ -199,8 +227,36 @@ function stageContent(cfg, model, openapiSpecs = {}) {
       })
       fs.writeFileSync(dest, text)
     } else {
+      if (aclOpts) {
+        const access = resolveAccess(f.dest, { pageAccess: normalizeAccess(f.access), ...aclOpts })
+        if (isProtected(access)) aclEntries.push({ dest: f.dest, access })
+      }
       fs.copyFileSync(f.src, dest)
     }
+  }
+
+  // Auth pages: the 403 body served by `mdbook serve` on a denied request, and
+  // the post-logout landing. Same generated-page pattern as the OAuth callback.
+  if (cfg.auth) {
+    const authDir = path.join(staging, 'auth')
+    fs.mkdirSync(authDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(authDir, 'denied.md'),
+      '---\ntitle: Access denied\nsearch: false\naside: false\n---\n\n# Access denied\n\n' +
+        'Your account does not have access to this page.\n\n' +
+        '<p><a href="/auth/logout">Sign in with a different account</a></p>\n'
+    )
+    fs.writeFileSync(
+      path.join(authDir, 'signed-out.md'),
+      '---\ntitle: Signed out\nsearch: false\naside: false\n---\n\n# Signed out\n\n' +
+        'You have been signed out.\n\n<p><a href="/auth/login">Sign in again</a></p>\n'
+    )
+    cfg.aclManifest = buildAclManifest({
+      entries: aclEntries,
+      rules: cfg.auth.rules,
+      assets: aclAssets,
+      siteDefault: cfg.auth.access
+    })
   }
 
   // OIDC redirect target. The authorization server will only redirect to a
@@ -317,6 +373,11 @@ export async function buildSite(projectRoot, overrides = {}) {
   const { build } = await import('vitepress')
   log('building…')
   await build(staging)
+  if (cfg.auth && cfg.aclManifest) {
+    fs.writeFileSync(path.join(cfg.build.out, 'acl.json'), JSON.stringify(cfg.aclManifest, null, 2))
+    const n = Object.keys(cfg.aclManifest.pages).length
+    log(`auth: acl.json written (${n} protected page(s), ${cfg.aclManifest.rules.length} rule(s))`)
+  }
   log(pc.green(`done -> ${cfg.build.out}`))
   return cfg.build.out
 }

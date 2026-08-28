@@ -11,6 +11,7 @@ import Breadcrumbs from './breadcrumbs.mjs'
 import Related from './related.mjs'
 import Zoom from './zoom.mjs'
 import OpenApi from './openapi.mjs'
+import Auth from './auth.mjs'
 import './styles/base.css'
 import './styles/smart-text.css'
 
@@ -64,7 +65,7 @@ export default {
   // presentation-mode controls once per layout.
   Layout: () =>
     h(DefaultTheme.Layout, null, {
-      'nav-bar-content-after': () => h(Zoom),
+      'nav-bar-content-after': () => [h(Zoom), h(Auth)],
       'doc-before': () => h(Breadcrumbs),
       'doc-after': () => [h(Related), h(Comments)],
       'layout-bottom': () => [h(Footer), h(Present), h(OpenApi)]

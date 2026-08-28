@@ -2,6 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import yaml from 'js-yaml'
+import { normalizeAuth } from './auth/config.mjs'
 
 const CONFIG_NAMES = ['config.yml', 'config.yaml', 'config.json']
 
@@ -75,6 +76,9 @@ export function loadConfig(projectRoot, overrides = {}) {
     searchExclude:
       (typeof data.search === 'object' && data.search && data.search.exclude) || [],
     openapi: normalizeOpenapi(data.openapi, projectRoot),
+    // Site authentication (see docs/auth-design.md): OIDC gate + access rules,
+    // resolved at build into acl.json and enforced by `mdbook serve`.
+    auth: normalizeAuth(data.auth),
     comments: data.comments || null, // e.g. { provider: giscus, repo, repoId, category, categoryId }
     footer: data.footer || null, // site footer: { message, copyright } (inline HTML allowed)
     locales: data.locales || null, // resolved from content when null
@@ -82,6 +86,18 @@ export function loadConfig(projectRoot, overrides = {}) {
       out: path.resolve(projectRoot, overrides.out || data.build?.out || '.mdbook/dist'),
       staging: path.resolve(projectRoot, data.build?.staging || '.mdbook/.cache/site'),
       cleanUrls: data.build?.cleanUrls ?? true
+    }
+  }
+  // The try-it console's OIDC falls back to the site auth block, so one realm
+  // and client id serve both, configured once.
+  if (cfg.openapi && !cfg.openapi.auth && cfg.auth?.clientId && cfg.auth?.issuer) {
+    cfg.openapi.auth = {
+      clientId: cfg.auth.clientId,
+      issuer: cfg.auth.issuer,
+      scopes: cfg.auth.scopes,
+      pkce: true,
+      redirectUri: '/oauth2/callback',
+      audience: null
     }
   }
   return cfg
@@ -104,6 +120,9 @@ export function applySpaceConfig(cfg, model) {
   if (ssg.footer && !cfg.footer) cfg.footer = ssg.footer
   if (ssg.search != null && raw.search == null) cfg.search = ssg.search
   if (ssg.logo && !cfg.site.logo) cfg.site.logo = ssg.logo
+  // wiki-ssg contract extension: the space may export access defaults
+  // (`ssg.auth: { access, rules }`). The repo's own auth block wins.
+  if (ssg.auth && raw.auth == null) cfg.auth = normalizeAuth(ssg.auth)
   return cfg
 }
 
