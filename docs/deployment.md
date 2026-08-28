@@ -69,7 +69,7 @@ proxy cannot send them.
 The GitHub Action can rsync the built site to the server after a build:
 
 ```yaml
-- uses: helex-solutions/mdbook@v1
+- uses: helex-solutions/mdbook@v1.5.0
   with:
     project: .
     deploy-target: deploy@docs.example.org:/srv/docs/mysite
