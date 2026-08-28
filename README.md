@@ -105,12 +105,12 @@ in [Authentication](#authentication).
      build:
        runs-on: ubuntu-latest
        steps:
-         - uses: actions/checkout@v4
+         - uses: actions/checkout@v7
          - id: mdbook
            uses: helex-solutions/mdbook@v1.1.2   # pin to a release tag (see Versioning)
            with: { project: . }
-         - uses: actions/configure-pages@v5
-         - uses: actions/upload-pages-artifact@v3
+         - uses: actions/configure-pages@v6
+         - uses: actions/upload-pages-artifact@v5
            with: { path: ${{ steps.mdbook.outputs.site }} }
      deploy:
        needs: build
@@ -118,7 +118,7 @@ in [Authentication](#authentication).
        environment: { name: github-pages, url: ${{ steps.deployment.outputs.page_url }} }
        steps:
          - id: deployment
-           uses: actions/deploy-pages@v4
+           uses: actions/deploy-pages@v5
    ```
 
 3. **Enable GitHub Pages** → repo *Settings → Pages → Source: GitHub Actions*.
