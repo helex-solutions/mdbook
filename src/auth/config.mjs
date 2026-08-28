@@ -89,6 +89,10 @@ export function normalizeAuth(data, env = process.env) {
     // app on the realm. 'idp' additionally performs RP-initiated logout at the
     // provider, ending that shared session.
     logout: (data.logout || 'local').toLowerCase() === 'idp' ? 'idp' : 'local',
+    // After a local sign-out, ask the provider for a fresh login next time, so
+    // "sign out" is not silently undone by the still-live realm session. Set
+    // false to let the next login complete silently as the same person.
+    reauthAfterLogout: (data.reauthAfterLogout ?? data['reauth-after-logout']) !== false,
     // Absolute public origin of the served site (scheme://host[:port]). Usually
     // derived per request from X-Forwarded-Proto/Host; set it when the proxy
     // does not send those headers.

@@ -296,6 +296,56 @@ test('sign-out is local by default and does not need the provider', async () => 
   }
 })
 
+test('a deliberate sign-out forces a fresh login next time', async () => {
+  const jose = await import('jose')
+  const { publicKey, privateKey } = await jose.generateKeyPair('RS256')
+  const jwk = await jose.exportJWK(publicKey)
+  jwk.kid = 'idp1'; jwk.alg = 'RS256'
+  let issuer
+  const idp = http.createServer((req, res) => {
+    if (req.url === '/.well-known/openid-configuration') {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({
+        issuer,
+        authorization_endpoint: `${issuer}/authorize`,
+        token_endpoint: `${issuer}/token`,
+        jwks_uri: `${issuer}/jwks`,
+        end_session_endpoint: `${issuer}/logout`
+      }))
+    } else { res.writeHead(404); res.end() }
+  })
+  const idpPort = await new Promise((r) => idp.listen(0, '127.0.0.1', () => r(idp.address().port)))
+  issuer = `http://127.0.0.1:${idpPort}`
+
+  const dist = makeDist()
+  const codec = createSessionCodec('s')
+  const auth = {
+    issuer, clientId: 'owlexicon', scopes: ['openid'], roleClaims: 'roles',
+    access: 'public', logout: 'local', reauthAfterLogout: true,
+    session: { maxAge: 3600 }, trustProxy: null
+  }
+  const { server, port } = await serve(createHandler({ dist, acl: ACL, auth, codec, quiet: true }))
+  try {
+    // A first login carries no prompt: arriving with a live SSO session from
+    // another application should sign the reader straight in.
+    const first = await get(port, '/auth/login')
+    assert.equal(new URL(first.headers.get('location')).searchParams.get('prompt'), null)
+
+    // Sign out, then follow the marker it leaves behind.
+    const out = await get(port, '/auth/logout')
+    const reauth = [].concat(out.headers.getSetCookie()).find((c) => c.startsWith('mdbook-reauth='))
+    assert.ok(reauth, 'sign-out must record that it was deliberate')
+
+    const again = await get(port, '/auth/login', { cookie: reauth.split(';')[0] })
+    const url = new URL(again.headers.get('location'))
+    assert.equal(url.searchParams.get('prompt'), 'login')
+    // …and the marker is spent, so the login after that is silent again.
+    assert.ok([].concat(again.headers.getSetCookie()).some((c) => /^mdbook-reauth=;/.test(c)))
+  } finally {
+    server.close(); idp.close()
+  }
+})
+
 test('path traversal is rejected', async () => {
   const dist = makeDist()
   const { server, port } = await serve(createHandler({ dist, quiet: true }))
