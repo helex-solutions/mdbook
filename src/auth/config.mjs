@@ -84,6 +84,11 @@ export function normalizeAuth(data, env = process.env) {
     roleClaims: String(data.roleClaims || data['role-claims'] || env.AUTH_ROLE_CLAIMS || 'roles'),
     access,
     rules,
+    // Sign-out scope. 'local' (default) drops this site's session only: signing
+    // out of the docs should not end the SSO session shared with every other
+    // app on the realm. 'idp' additionally performs RP-initiated logout at the
+    // provider, ending that shared session.
+    logout: (data.logout || 'local').toLowerCase() === 'idp' ? 'idp' : 'local',
     // Absolute public origin of the served site (scheme://host[:port]). Usually
     // derived per request from X-Forwarded-Proto/Host; set it when the proxy
     // does not send those headers.

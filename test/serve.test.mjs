@@ -17,6 +17,7 @@ function makeDist() {
   w('open.html', '<h1>open</h1>')
   w('internal/secret.html', '<h1>secret</h1>')
   w('auth/denied.html', '<h1>denied</h1>')
+  w('auth/signed-out.html', '<h1>signed out</h1>')
   w('404.html', '<h1>nope</h1>')
   w('attachments/42/pic.png', 'PNG')
   w('assets/app.js', 'js')
@@ -237,6 +238,64 @@ test('site base path is stripped for ACL and file lookup', async () => {
   }
 })
 
+test('generated pages under /auth/ are served, not swallowed by the endpoints', async () => {
+  const dist = makeDist()
+  const codec = createSessionCodec('s')
+  const auth = {
+    issuer: 'https://sso.example.org/realms/x',
+    clientId: 'owlexicon',
+    scopes: ['openid'],
+    roleClaims: 'roles',
+    access: 'public',
+    logout: 'local',
+    session: { maxAge: 3600 },
+    trustProxy: null
+  }
+  const { server, port } = await serve(createHandler({ dist, acl: ACL, auth, codec, quiet: true }))
+  try {
+    // The page the provider redirects to after logout must not 404.
+    const out = await get(port, '/auth/signed-out')
+    assert.equal(out.status, 200)
+    assert.match(await out.text(), /signed out/)
+    assert.equal(out.headers.get('cache-control'), 'no-store')
+    assert.equal((await get(port, '/auth/denied')).status, 200)
+    // Real endpoints still behave as endpoints.
+    assert.equal((await get(port, '/auth/session')).status, 401)
+  } finally {
+    server.close()
+  }
+})
+
+test('sign-out is local by default and does not need the provider', async () => {
+  const dist = makeDist()
+  const codec = createSessionCodec('s')
+  const base = {
+    // An unreachable issuer: a local sign-out must still work, which is exactly
+    // when a reader wants out.
+    issuer: 'https://unreachable.invalid/realms/x',
+    clientId: 'owlexicon',
+    scopes: ['openid'],
+    roleClaims: 'roles',
+    access: 'public',
+    session: { maxAge: 3600 },
+    trustProxy: null
+  }
+  const cookie = `mdbook-session=${codec.sign({ sub: 'u1', name: 'a', roles: ['editor'], exp: Math.floor(Date.now() / 1000) + 60 })}`
+
+  const local = await serve(createHandler({ dist, acl: ACL, auth: { ...base, logout: 'local' }, codec, quiet: true }))
+  try {
+    const res = await get(local.port, '/auth/logout', { cookie })
+    assert.equal(res.status, 302)
+    // Lands on this site, not at the provider — the realm session survives.
+    assert.match(res.headers.get('location'), /\/auth\/signed-out$/)
+    assert.ok([].concat(res.headers.getSetCookie()).some((c) => /^mdbook-session=;/.test(c) && /Max-Age=0/.test(c)))
+    // And the session really is gone.
+    assert.equal((await get(local.port, '/internal/secret')).status, 302)
+  } finally {
+    local.server.close()
+  }
+})
+
 test('path traversal is rejected', async () => {
   const dist = makeDist()
   const { server, port } = await serve(createHandler({ dist, quiet: true }))
@@ -342,12 +401,27 @@ test('OIDC verify mode: full login roundtrip against a mock IdP', async () => {
     // 5. State mismatch is rejected.
     const badCb = await get(port, `/auth/callback?code=abc123&state=WRONG`, { cookie: pkceCookie })
     assert.equal(badCb.status, 400)
-    // 6. Logout clears the session and does RP-initiated logout at the IdP.
+    // 6. Logout clears the session and, by default, stays local — the realm
+    //    session is left alone so other apps on it are unaffected.
     const out = await get(port, '/auth/logout', { cookie })
     assert.equal(out.status, 302)
-    const outUrl = new URL(out.headers.get('location'))
-    assert.equal(outUrl.pathname, '/logout')
-    assert.equal(outUrl.searchParams.get('client_id'), 'owlexicon')
+    assert.match(out.headers.get('location'), /\/auth\/signed-out$/)
+    assert.equal((await get(port, '/internal/secret', { cookie })).status, 200) // cookie itself still valid…
+    assert.ok([].concat(out.headers.getSetCookie()).some((c) => /^mdbook-session=;/.test(c)))
+
+    // 7. logout: 'idp' opts in to RP-initiated logout at the provider.
+    const rp = await serve(createHandler({ dist, base: '/', acl: ACL, auth: { ...auth, logout: 'idp' }, codec, quiet: true }))
+    try {
+      const res = await get(rp.port, '/auth/logout', { cookie })
+      assert.equal(res.status, 302)
+      const outUrl = new URL(res.headers.get('location'))
+      assert.equal(outUrl.origin, issuer)
+      assert.equal(outUrl.pathname, '/logout')
+      assert.equal(outUrl.searchParams.get('client_id'), 'owlexicon')
+      assert.match(outUrl.searchParams.get('post_logout_redirect_uri'), /\/auth\/signed-out$/)
+    } finally {
+      rp.server.close()
+    }
   } finally {
     server.close()
     idp.close()

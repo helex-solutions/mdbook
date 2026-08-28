@@ -10,23 +10,37 @@ import { defineComponent, ref, onMounted, watch, h, nextTick } from 'vue'
 import { useData, useRoute, withBase } from 'vitepress'
 import { requirementFor, isAllowed } from '../auth/acl.mjs'
 
-let cached = null // { session, acl } shared across route changes
+// The manifest is fixed for a deployment, so it is fetched once. The session is
+// not: it changes on sign-in and sign-out, including in another tab, so it is
+// re-read on every mount and whenever the page is restored from the back/forward
+// cache — otherwise a reader who signs out and navigates back sees the chrome of
+// a session that no longer exists.
+let aclCache = null
 
-async function loadState() {
-  if (cached) return cached
-  let session = null
-  const res = await fetch(withBase('/auth/session'), { headers: { accept: 'application/json' } })
-  if (res.ok) session = await res.json()
-  else if (res.status !== 401) throw new Error(`session ${res.status}`)
-  let acl = null
+async function loadAcl() {
+  if (aclCache !== null) return aclCache
   try {
     const a = await fetch(withBase('/acl.json'))
-    if (a.ok) acl = await a.json()
+    aclCache = a.ok ? await a.json() : false
   } catch {
-    /* no manifest — no filtering */
+    aclCache = false // no manifest — no filtering
   }
-  cached = { session, acl }
-  return cached
+  return aclCache
+}
+
+async function loadSession() {
+  const res = await fetch(withBase('/auth/session'), {
+    headers: { accept: 'application/json' },
+    cache: 'no-store'
+  })
+  if (res.ok) return res.json()
+  if (res.status === 401) return null
+  throw new Error(`session ${res.status}`)
+}
+
+async function loadState() {
+  const [session, acl] = await Promise.all([loadSession(), loadAcl()])
+  return { session, acl: acl || null }
 }
 
 // Hide sidebar/nav links whose target the current session cannot access.
@@ -55,16 +69,27 @@ export default defineComponent({
     const route = useRoute()
     const state = ref(null) // null = unavailable/loading, else { session, acl }
 
-    onMounted(async () => {
-      if (!theme.value.auth?.enabled) return
+    const refresh = async () => {
       try {
         state.value = await loadState()
       } catch {
-        return // no serve endpoints behind this host — stay hidden
+        state.value = null // no serve endpoints behind this host — stay hidden
+        return
       }
-      const refilter = () => nextTick(() => filterMenus(state.value.acl, state.value.session))
-      refilter()
-      watch(() => route.path, refilter)
+      nextTick(() => filterMenus(state.value.acl, state.value.session))
+    }
+
+    onMounted(async () => {
+      if (!theme.value.auth?.enabled) return
+      await refresh()
+      watch(() => route.path, () =>
+        nextTick(() => state.value && filterMenus(state.value.acl, state.value.session))
+      )
+      // A page restored from the back/forward cache keeps its old JavaScript
+      // state, so the session has to be re-read rather than assumed.
+      window.addEventListener('pageshow', (e) => {
+        if (e.persisted) refresh()
+      })
     })
 
     return () => {

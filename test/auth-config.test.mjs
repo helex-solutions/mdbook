@@ -86,6 +86,13 @@ test('normalizeAuth: trustProxy defaults', () => {
   assert.equal(a.trustProxy.rolesHeader, 'X-Auth-Request-Groups')
 })
 
+test('normalizeAuth: logout defaults to local, idp is opt-in', () => {
+  assert.equal(normalizeAuth({}, env()).logout, 'local')
+  assert.equal(normalizeAuth({ logout: 'idp' }, env()).logout, 'idp')
+  assert.equal(normalizeAuth({ logout: 'IDP' }, env()).logout, 'idp')
+  assert.equal(normalizeAuth({ logout: 'nonsense' }, env()).logout, 'local')
+})
+
 test('normalizeAccess forms', () => {
   assert.equal(normalizeAccess('public'), 'public')
   assert.equal(normalizeAccess('authenticated'), 'authenticated')
