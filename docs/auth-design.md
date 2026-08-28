@@ -1,8 +1,10 @@
 # Authentication — design
 
-Status: **design, not yet implemented.** This document specifies the `auth:` capability: gating a
-built site behind OpenID Connect (Keycloak being the primary target) with per-section rules and
-per-page overrides. The wider architecture — how this fits the Owlexicon wiki, the Helex suite
+Status: **implemented** — config, build-time ACL + `acl.json`, `mdbook serve` with verify and
+trust-proxy modes, theme widget, Action deploy target. Still tracked: multi-space portal
+ingest, silent session renewal, title-leak-free menus. This document specifies the `auth:`
+capability: gating a built site behind OpenID Connect (Keycloak being the primary target) with
+per-section rules and per-page overrides. The wider architecture — how this fits the Owlexicon wiki, the Helex suite
 and the `wiki-ssg` export — lives in the helex-tx spec series (`OWLEXICON.01`); this document is
 the mdbook-level contract the implementation follows.
 
@@ -103,7 +105,7 @@ The build stays static-host-compatible; auth adds metadata, it does not change p
    ```json
    {
      "default": "public",
-     "rules": [ { "route": "/internal/", "access": ["editor", "admin"] } ],
+     "rules": [ { "path": "internal/**", "access": ["editor", "admin"] } ],
      "pages": { "/internal/keys": ["admin"] },
      "assets": [ { "prefix": "/attachments/42/", "access": ["editor", "admin"] } ]
    }

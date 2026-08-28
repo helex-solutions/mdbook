@@ -26,6 +26,29 @@ inputs:
     description: Node.js version to build with.
     required: false
     default: '26'
+  deploy-target:
+    description: >-
+      Publish the built site to a Linux server over SSH: rsync destination in
+      user@host:/path form. Leave empty to skip deployment (e.g. when
+      publishing to GitHub Pages instead). Requires deploy-key.
+    required: false
+    default: ''
+  deploy-key:
+    description: SSH private key authorized on the deploy host (pass a secret).
+    required: false
+    default: ''
+  deploy-port:
+    description: SSH port on the deploy host.
+    required: false
+    default: '22'
+  deploy-post:
+    description: >-
+      Command to run on the deploy host after the sync — typically reloading
+      the systemd unit running `mdbook serve` (e.g. "sudo systemctl restart
+      mdbook-docs"). Not needed for a pure content update: serve re-reads
+      files per request, only acl.json/config changes need a restart.
+    required: false
+    default: ''
 
 outputs:
   site:
@@ -58,3 +81,27 @@ runs:
         SITE="${{ inputs.output }}"
         if [ -z "$SITE" ]; then SITE="${{ inputs.project }}/.mdbook/dist"; fi
         echo "site=$SITE" >> "$GITHUB_OUTPUT"
+
+    # Publish straight to an own Linux server (docs/auth-design.md — the
+    # primary target for a gated site: dist + acl.json land next to a
+    # systemd-managed `mdbook serve` behind nginx).
+    - name: Deploy to server
+      if: inputs.deploy-target != ''
+      shell: bash
+      env:
+        DEPLOY_KEY: ${{ inputs.deploy-key }}
+      run: |
+        if [ -z "$DEPLOY_KEY" ]; then
+          echo "::error::deploy-target is set but deploy-key is empty" >&2
+          exit 1
+        fi
+        KEY_FILE="$(mktemp)"
+        printf '%s\n' "$DEPLOY_KEY" > "$KEY_FILE"
+        chmod 600 "$KEY_FILE"
+        SSH="ssh -i $KEY_FILE -p ${{ inputs.deploy-port }} -o StrictHostKeyChecking=accept-new"
+        rsync -az --delete -e "$SSH" "${{ steps.build.outputs.site }}/" "${{ inputs.deploy-target }}/"
+        if [ -n "${{ inputs.deploy-post }}" ]; then
+          HOST="${{ inputs.deploy-target }}"
+          $SSH "${HOST%%:*}" "${{ inputs.deploy-post }}"
+        fi
+        rm -f "$KEY_FILE"

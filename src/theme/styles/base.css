@@ -544,3 +544,31 @@ a.mdbook-crumb:hover {
    that set display on headings. */
 .vp-doc [hidden] { display: none !important; }
 .mdbook-present .mdbook-op-filter { display: none !important; }
+
+/* --- site authentication (src/theme/auth.mjs) --- */
+.mdbook-auth {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.mdbook-auth-user {
+  color: var(--vp-c-text-2);
+  max-width: 14em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mdbook-auth-signin,
+.mdbook-auth-signout {
+  color: var(--vp-c-brand-1);
+  font-weight: 500;
+}
+.mdbook-auth-signin:hover,
+.mdbook-auth-signout:hover {
+  color: var(--vp-c-brand-2);
+}
+.mdbook-auth-hidden {
+  display: none !important;
+}

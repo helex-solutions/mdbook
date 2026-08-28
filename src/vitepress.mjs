@@ -79,6 +79,7 @@ function themeConfigFor(bundle, lang) {
     ...(bundle.comments ? { comments: bundle.comments } : {}),
     ...(bundle.footer ? { footer: bundle.footer } : {}),
     ...(bundle.openapi ? { openapi: bundle.openapi } : {}),
+    ...(bundle.auth ? { auth: bundle.auth } : {}),
     outline: bundle.outline || [2, 3]
   }
 }

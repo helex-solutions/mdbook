@@ -15,7 +15,8 @@ function parseArgs(argv) {
     else if (a === '--host') {
       // `--host` binds all interfaces; `--host <addr>` binds a specific one.
       args.host = argv[i + 1] && !argv[i + 1].startsWith('-') ? argv[++i] : true
-    } else if (a === '--help' || a === '-h') args.help = true
+    } else if (a === '--build') args.build = true
+    else if (a === '--help' || a === '-h') args.help = true
     else args._.push(a)
   }
   return args
@@ -26,13 +27,15 @@ const HELP = `mdbook — Markdown + metadata static site generator
 Usage:
   mdbook build [--project <dir>] [--out <dir>]
   mdbook dev   [--project <dir>] [--port <n>] [--host [addr]]
+  mdbook serve [--project <dir>] [--port <n>] [--host [addr]] [--build]
 
 Options:
   -p, --project <dir>   Project root containing .mdbook/ (default: cwd)
   -o, --out <dir>       Output directory (default: .mdbook/dist)
       --base <path>     Base path (auto-detected from GITHUB_REPOSITORY in CI)
-      --port <n>        Dev server port (default: 5173)
-      --host [addr]     Expose the dev server on the network (bind all/<addr>)
+      --port <n>        Server port (dev default: 5173, serve default: 8080)
+      --host [addr]     Expose the server on the network (bind all/<addr>)
+      --build           serve: build the site first
   -h, --help            Show this help
 `
 
@@ -54,6 +57,11 @@ async function main() {
     await buildSite(projectRoot, overrides)
   } else if (cmd === 'dev') {
     await devSite(projectRoot, overrides)
+  } else if (cmd === 'serve') {
+    // The auth-enforcing production server (plain static server without auth).
+    if (args.build) await buildSite(projectRoot, overrides)
+    const { serveSite } = await import('../src/serve.mjs')
+    await serveSite(projectRoot, overrides)
   } else {
     console.error(`Unknown command: ${cmd}\n`)
     console.log(HELP)
