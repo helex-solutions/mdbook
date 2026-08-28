@@ -483,7 +483,9 @@ docker run -p 8080:8080 -v /srv/docs/mysite:/site ghcr.io/helex-solutions/mdbook
 site: either build in CI and mount the result — the mount can then be read-only — or set
 `MDBOOK_BUILD=1` to build on start. Any argument runs that command instead of serving, so a
 one-shot build is `docker run -v /srv/docs/mysite:/site ghcr.io/helex-solutions/mdbook build`.
-See [`docker-compose.example.yml`](docker-compose.example.yml).
+See [`docker-compose.example.yml`](docker-compose.example.yml) and
+[`docs/deployment.md`](docs/deployment.md); a live example runs at
+[tx.helex.dev/mdbook](https://tx.helex.dev/mdbook/) from [`demo/`](demo).
 
 Put nginx in front for TLS; when the site is mounted under a path, set `site.base` to match:
 
