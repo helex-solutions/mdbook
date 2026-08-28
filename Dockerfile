@@ -20,12 +20,17 @@ COPY bin ./bin
 COPY src ./src
 COPY vendor ./vendor
 
-RUN ln -s /opt/mdbook/bin/mdbook.mjs /usr/local/bin/mdbook \
+# A wrapper rather than a symlink: bin/mdbook.mjs is mode 644 in git, so the
+# entry point must not depend on the execute bit surviving the copy.
+RUN printf '#!/bin/sh\nexec node /opt/mdbook/bin/mdbook.mjs "$@"\n' > /usr/local/bin/mdbook \
+    && chmod +x /usr/local/bin/mdbook \
     && addgroup -g 10001 mdbook \
     && adduser -u 10001 -G mdbook -s /bin/sh -D mdbook
 
 # The project volume. A read-only mount works when the site is pre-built and
 # MDBOOK_BUILD is unset — the container writes nothing outside /tmp then.
+# With MDBOOK_BUILD=1 the volume must be writable by uid 10001 (the build
+# writes .mdbook/dist and .mdbook/.cache), e.g. `chown -R 10001:10001 <dir>`.
 VOLUME ["/site"]
 ENV MDBOOK_PROJECT=/site \
     MDBOOK_PORT=8080 \
