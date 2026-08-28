@@ -1,0 +1,8 @@
+.git
+.github
+.claude
+node_modules
+docs/assets
+test
+demo/*/.mdbook/dist
+demo/*/.mdbook/.cache

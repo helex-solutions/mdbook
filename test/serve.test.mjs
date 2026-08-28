@@ -213,6 +213,30 @@ test('bearer JWT verified against a configured issuer JWKS', async () => {
   }
 })
 
+test('site base path is stripped for ACL and file lookup', async () => {
+  const dist = makeDist()
+  const auth = {
+    access: 'public',
+    trustProxy: { userHeader: 'X-Auth-Request-User', rolesHeader: 'X-Auth-Request-Groups' },
+    session: { maxAge: 3600 }
+  }
+  const { server, port } = await serve(createHandler({ dist, base: '/mdbook/', acl: ACL, auth, quiet: true }))
+  try {
+    assert.equal((await get(port, '/mdbook/')).status, 200)
+    assert.equal((await get(port, '/mdbook/open')).status, 200)
+    // The ACL is base-relative, so the rule still matches under the mount.
+    const anon = await get(port, '/mdbook/internal/secret')
+    assert.equal(anon.status, 302)
+    assert.match(anon.headers.get('location'), /^\/mdbook\/auth\/login\?returnTo=/)
+    assert.equal(
+      (await get(port, '/mdbook/internal/secret', { 'X-Auth-Request-User': 'a', 'X-Auth-Request-Groups': 'editor' })).status,
+      200
+    )
+  } finally {
+    server.close()
+  }
+})
+
 test('path traversal is rejected', async () => {
   const dist = makeDist()
   const { server, port } = await serve(createHandler({ dist, quiet: true }))

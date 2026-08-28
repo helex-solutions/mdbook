@@ -1,0 +1,21 @@
+# One generic mdbook image, content from a volume — the same image serves every
+# installation; a site is a directory you mount.
+services:
+  docs:
+    image: ghcr.io/helex-solutions/mdbook:latest
+    container_name: mdbook-docs
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"        # nginx in front terminates TLS
+    volumes:
+      - /srv/docs/mysite:/site:ro    # drop :ro if MDBOOK_BUILD is set
+    environment:
+      # Build on start instead of mounting a pre-built dist (small sites, demos).
+      # MDBOOK_BUILD: "1"
+      #
+      # Authentication (see docs/auth-design.md). Config may name these directly;
+      # env lets one image serve dev and prod unchanged.
+      # AUTH_OIDC_AUTHORITY: https://sso.example.org/realms/htx
+      # AUTH_OIDC_CLIENT_ID: owlexicon
+      # AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET}
+      TZ: UTC
