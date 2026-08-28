@@ -100,6 +100,11 @@ function makeBundle(cfg, model) {
     txServer: cfg.txServer,
     spaceCode: model.spaceCode || null,
     pageSlugs,
+    // Portal (multi-space) context for the markdown layer: which mounts exist,
+    // each mount's own slugs, and space-code -> mount for page:space/slug links.
+    portal: model.portal || false,
+    spaceMounts: model.spaceMounts || null,
+    spaceSlugs: model.spaceSlugs || null,
     logo: cfg.site.logo,
     mdbookDir: path.resolve(MDBOOK_SRC, '..'),
     outDir: cfg.build.out,
@@ -158,7 +163,7 @@ function stageContent(cfg, model, openapiSpecs = {}) {
   // Which staged folders actually have an index page — a breadcrumb for a folder
   // without one is shown as plain text rather than a link to a 404.
   const destSet = new Set(model.contentFiles.map((f) => f.dest))
-  const sdDirs = [
+  const sdDirs = model.resourceDirs || [
     path.join(cfg.projectRoot, cfg.source.meta || '__source', 'resources', 'structure-definition'),
     path.join(cfg.projectRoot, 'input', 'resources', 'structure-definition')
   ]
@@ -174,17 +179,19 @@ function stageContent(cfg, model, openapiSpecs = {}) {
       )
       continue
     }
-    if (f.src.endsWith('.md')) {
-      let text = fs.readFileSync(f.src, 'utf8')
+    if (f.content != null || f.src?.endsWith('.md')) {
+      let text = f.content ?? fs.readFileSync(f.src, 'utf8')
       let access = null
       if (aclOpts) {
         const pageAccess = normalizeAccess(f.access) || readAccessFrontmatter(text)
         access = resolveAccess(f.dest, { pageAccess, ...aclOpts })
         if (isProtected(access)) {
           aclEntries.push({ dest: f.dest, access })
-          // Attachments referenced by a protected page are protected with it.
+          // Attachments referenced by a protected page are protected with it
+          // (portal attachments are namespaced per mount).
+          const at = f.mount ? `/attachments/${f.mount}` : '/attachments'
           for (const m of text.matchAll(/(?:files|attachments)\/([A-Za-z0-9_-]+)\//g)) {
-            aclAssets.push({ prefix: `/attachments/${m[1]}/`, access })
+            aclAssets.push({ prefix: `${at}/${m[1]}/`, access })
           }
         }
       }
@@ -281,10 +288,17 @@ function stageContent(cfg, model, openapiSpecs = {}) {
     copyDir(a.srcDir, path.join(staging, 'public', a.destDir))
   }
 
-  // TermX attachments -> public/attachments (served from site root).
-  const attachments = path.join(cfg.projectRoot, cfg.source.meta || '__source', 'attachments')
-  if (fs.existsSync(attachments)) {
-    copyDir(attachments, path.join(staging, 'public', 'attachments'))
+  // TermX attachments -> public/attachments (served from site root). A portal
+  // namespaces them per mount so page ids from different instances can't collide.
+  if (model.attachmentDirs) {
+    for (const a of model.attachmentDirs) {
+      copyDir(a.srcDir, path.join(staging, 'public', 'attachments', a.mount))
+    }
+  } else {
+    const attachments = path.join(cfg.projectRoot, cfg.source.meta || '__source', 'attachments')
+    if (fs.existsSync(attachments)) {
+      copyDir(attachments, path.join(staging, 'public', 'attachments'))
+    }
   }
 
   // Resolve/neutralize image references so a missing asset can't fail the build.

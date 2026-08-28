@@ -42,6 +42,7 @@ Real sites built with mdbook — click a thumbnail for the live site (see
 - 🖥️ **Presentation mode** — a fullscreen, chrome-free view with prev/next controls for showing pages to an audience (see [Presentation mode](#presentation-mode))
 - 🔍 **Zoom** — a −/+ control in the nav bar scales the article (80–200%, remembered per browser); pair it with `theme.wide` for dense reference tables
 - 🔐 **Authentication** — gate the site (or sections of it, or single pages) behind OpenID Connect (Keycloak), enforced server-side by `mdbook serve` (see [Authentication](#authentication))
+- 🗂️ **Multi-space portals** — compose several TermX wiki-ssg exports into one site, each space mounted under its own section with its own sidebar and access rules (see [Multi-space portals](#multi-space-portals))
 
 See [`docs/termx-wiki-compatibility.md`](docs/termx-wiki-compatibility.md) for the full
 TermX Wiki → mdbook feature matrix.
@@ -146,6 +147,9 @@ site:
 
 source:
   format: gitbook              # gitbook | termx  (auto-detected if omitted)
+  spaces:                      # termx only — multi-space portal (see Multi-space portals)
+    handbook: spaces/handbook  #   mount key -> wiki-ssg export dir
+    api: spaces/api
   exclude:                     # hide files/folders from BOTH the pages and the menu
     - CLAUDE.md                #   bare name -> matches at any depth
     - _templates               #   folder name -> the whole subtree
@@ -465,6 +469,28 @@ held in `sessionStorage` (gone when the tab closes), never placed in a URL.
 
 Set `tryIt: false` to render the reference documentation without any console — useful when
 the API is internal and only the docs are public.
+
+## Multi-space portals
+
+One deployment, many wiki spaces — the Confluence shape. Point `source.spaces` at several
+wiki-ssg exports and each mounts under its key (`/handbook/…`, `/api/…`; locales under
+`/<lang>/<mount>/…`) with its own sidebar; the nav gets one entry per space and a portal home
+page linking the spaces is generated per locale.
+
+```yaml
+site: { title: Docs Portal, lang: en }
+source:
+  spaces:
+    handbook: spaces/handbook   # dir with space.json / pages.json / pages/ / attachments/
+    api: spaces/api
+```
+
+Cross-space `page:<space>/<slug>` links resolve internally when the target space is mounted
+(by space code or mount key), attachments are namespaced per mount so page ids from different
+TermX instances cannot collide, and access control composes: portal-level `auth.rules` match
+mounted paths (`api/**`), a space's exported `ssg.auth` arrives as rules scoped to its mount,
+and per-page `access` works as everywhere else — one `acl.json`, one `serve` process, one login
+for the whole portal.
 
 ## Authentication
 

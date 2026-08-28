@@ -9,7 +9,7 @@ import sub from 'markdown-it-sub'
 import sup from 'markdown-it-sup'
 import footnote from 'markdown-it-footnote'
 import taskLists from 'markdown-it-task-lists'
-import { termxLinks } from './termx-links.mjs'
+import { termxLinks, mountFromPath } from './termx-links.mjs'
 import { termxImages } from './termx-images.mjs'
 import { termxEmbeds } from './termx-embeds.mjs'
 import { collapsible } from './collapsible.mjs'
@@ -79,4 +79,4 @@ export function applyMarkdown(md, opts = {}) {
   }
 }
 
-export { termxLinks, termxImages, collapsible, cardGrid }
+export { termxLinks, termxImages, mountFromPath, collapsible, cardGrid }

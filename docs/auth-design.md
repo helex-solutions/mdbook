@@ -1,8 +1,8 @@
 # Authentication — design
 
 Status: **implemented** — config, build-time ACL + `acl.json`, `mdbook serve` with verify and
-trust-proxy modes, theme widget, Action deploy target. Still tracked: multi-space portal
-ingest, silent session renewal, title-leak-free menus. This document specifies the `auth:`
+trust-proxy modes, theme widget, Action deploy target, multi-space portal ingest
+(`source.spaces`). Still tracked: silent session renewal, title-leak-free menus. This document specifies the `auth:`
 capability: gating a built site behind OpenID Connect (Keycloak being the primary target) with
 per-section rules and per-page overrides. The wider architecture — how this fits the Owlexicon wiki, the Helex suite
 and the `wiki-ssg` export — lives in the helex-tx spec series (`OWLEXICON.01`); this document is
@@ -198,9 +198,10 @@ config.
 
 When `auth:` is configured, `serve` **is** the deployment — there is no supported gated
 deployment without it. Multi-space portals (several wiki spaces under one origin, Confluence
-style — each space a section with its own rule, one login for the portal) are the intended
-shape; the multi-space ingest that composes several exports into one site is tracked alongside
-the auth implementation.
+style) are first-class: `source.spaces` mounts each wiki-ssg export under its own section,
+portal rules match mounted paths (`api/**`), a space's exported `ssg.auth` becomes rules scoped
+to its mount, attachments are namespaced per mount — one `acl.json`, one `serve` process, one
+login for the whole portal.
 
 ## Macro parity contract
 
