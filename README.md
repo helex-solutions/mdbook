@@ -470,6 +470,32 @@ held in `sessionStorage` (gone when the tab closes), never placed in a URL.
 Set `tryIt: false` to render the reference documentation without any console — useful when
 the API is internal and only the docs are public.
 
+## Docker
+
+One generic image; the site is a **mounted volume**, so the same image serves every
+installation and upgrading mdbook is a tag bump:
+
+```bash
+docker run -p 8080:8080 -v /srv/docs/mysite:/site ghcr.io/helex-solutions/mdbook
+```
+
+`/site` is a project directory (the one holding `.mdbook/config.yml`). `serve` needs a built
+site: either build in CI and mount the result — the mount can then be read-only — or set
+`MDBOOK_BUILD=1` to build on start. Any argument runs that command instead of serving, so a
+one-shot build is `docker run -v /srv/docs/mysite:/site ghcr.io/helex-solutions/mdbook build`.
+See [`docker-compose.example.yml`](docker-compose.example.yml).
+
+Put nginx in front for TLS; when the site is mounted under a path, set `site.base` to match:
+
+```nginx
+location /mdbook/ {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host  $host;
+}
+```
+
 ## Multi-space portals
 
 One deployment, many wiki spaces — the Confluence shape. Point `source.spaces` at several
