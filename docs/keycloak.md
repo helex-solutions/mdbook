@@ -99,6 +99,11 @@ $KC create identity-provider/instances -r $R \
   -s 'config.clientId=<google-oauth-client-id>'
 ```
 
+The provider is created with `storeToken: true` (so a session can be refreshed
+against Google), Google's discovery URL alongside the explicit endpoints, and
+three identity-provider mappers recording `sub`, `amr` and `acr` as user
+attributes — who the user is at the provider, and how they authenticated.
+
 Two steps are deliberately left to a human, because both involve a secret or an
 account this tooling should not touch:
 
@@ -112,9 +117,23 @@ account this tooling should not touch:
    https://sso.helex.dev/realms/<realm>/broker/google/endpoint
    ```
 
-   Each realm brokering the same Google client needs its own entry. Google answers
-   `Error 400: redirect_uri_mismatch` until it is added — which is the error to
-   expect while testing, not a Keycloak misconfiguration.
+   Each realm brokering the same Google client needs its own entry — one OAuth
+   client can serve several realms, it just needs every callback listed. Google
+   answers `Error 400: redirect_uri_mismatch` until it is added, which is the
+   error to expect while testing, not a Keycloak misconfiguration. Once the URI
+   is registered, the account chooser appears and only the secret remains.
+
+**Copying a provider between realms.** The admin API **masks** `clientSecret`
+(it reads back as `**********`), so a provider cannot be cloned complete: copy
+every other field, then paste the secret once in the target realm. Writing the
+masked string back would set that literal value as the secret. Copying it at the
+database level works but needs a Keycloak restart to clear the config cache —
+disruptive on a shared instance, and rarely worth it for one field.
+
+**Realm-specific flows do not travel.** A `postBrokerLoginFlowAlias` naming a
+flow the target realm lacks breaks every login through that provider, so drop it
+unless the flow exists there too (the reference `emr` realm points at an
+IP-allow-list flow that a public docs site should not inherit blindly).
 
 > **A federated user arrives with no roles.** Signing in with Google proves who
 > someone is, not what they may read, so a brand-new Google user meets
