@@ -69,6 +69,11 @@ docker run -d --name docs --restart unless-stopped \
   ghcr.io/helex-solutions/mdbook
 ```
 
+The image is public, so that pull needs no login — but it is published **on demand**, not on
+every push, so `:latest` can be behind `main`. Upgrading is a pull plus a container *replacement*:
+`docker restart` keeps the old image and silently changes nothing. Both are in
+[`docs/deployment.md`](docs/deployment.md#upgrading).
+
 An **authenticated** site must be served by `mdbook serve` (the Docker row above, or Node on the
 host) — a static host cannot enforce access. Full instructions, including the nginx location and
 publishing from CI, are in [`docs/deployment.md`](docs/deployment.md); identity provider setup is
@@ -586,7 +591,15 @@ silently return the same person.
 `serve` performs the OAuth code + PKCE flow server-side and holds the session in a signed
 HttpOnly cookie — no token ever reaches the browser, and a plain `<img>` can load a protected
 attachment. Unauthenticated visitors are redirected to sign in; authenticated ones lacking the
-role get a 403 page. Bearer JWTs are accepted too, verified against the configured issuer(s) —
+role get a 403 page naming the role they are missing — rendered by `serve` itself, self-contained,
+because a reader denied the site is denied its theme bundle too and a built page would reach them
+unstyled. The post-logout landing is rendered the same way, for the same reason.
+
+Gating the **whole** site (`access: [viewer]` with no public section) is supported and is a
+different operational proposition: signing in no longer implies reading, so every new reader needs
+a role assigned before they see anything. Give the realm a default role, or plan for that step.
+
+Bearer JWTs are accepted too, verified against the configured issuer(s) —
 `auth.issuers` lets one site accept several IdPs. Behind a gateway that already authenticates
 (oauth2-proxy, Cloudflare Access), skip verification and trust its headers instead:
 
