@@ -118,17 +118,22 @@ The build stays static-host-compatible; auth adds metadata, it does not change p
 2. **Search exclusion** — every protected page gets `search: false` frontmatter (the existing
    lever, already used for redirect stubs and the OAuth callback page), so the VitePress local
    search chunk (`assets/chunks/@localSearchIndex*.js`) never contains protected text.
-3. **Generated pages** — following the OAuth-callback-page pattern in `src/build.mjs`: a
-   post-logout landing page, `search: false`. Routes under `/auth/` are always `public` in the
-   manifest: they hold no documentation, and inheriting a role site-default meant a reader who
-   had just signed out was bounced from the "Signed out" page back to the login page.
+3. **Auth pages are not built** — the 403 body and the post-logout landing are rendered by
+   `serve` itself, self-contained (inline CSS, no scripts), from `src/auth/pages.mjs`.
 
-   The **403 page is not generated** — `serve` renders it itself, self-contained, from
-   `src/auth/denied-page.mjs`. It has to be: a reader who fails the ACL fails it for the theme
-   bundle too (under a role site-default, `/assets/` is protected like everything else), so a
-   built page would arrive with its stylesheet and scripts 403'd and render as raw markup.
-   Publishing `/assets/` instead is not available — VitePress emits one content chunk per page
-   there, so that would publish every gated page.
+   They have to be. Both are shown to someone the ACL is currently refusing: a reader without
+   the role, or a reader who has just signed out and is anonymous again. Under a role
+   site-default, `/assets/` is protected like everything else, so a built page reaches them with
+   its stylesheet and scripts 403'd and renders as raw markup. Publishing `/assets/` instead is
+   not available — VitePress emits one content chunk per page there, so that would publish every
+   gated page.
+
+   Routes under `/auth/` are also always `public` in the manifest: they hold no documentation,
+   and inheriting a role site-default meant a reader who had just signed out was bounced from
+   the "Signed out" page back to the login page.
+
+   The 403 page offers "Back to the site" only when the site root is readable by that session —
+   on a wholly gated site it is not, and the link would return to the same denial.
 
 ### Leak model (v1)
 

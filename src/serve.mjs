@@ -16,7 +16,7 @@ import crypto from 'node:crypto'
 import pc from 'picocolors'
 import { loadConfig } from './config.mjs'
 import { requirementFor, isAllowed } from './auth/acl.mjs'
-import { deniedPageHtml } from './auth/denied-page.mjs'
+import { deniedPageHtml, signedOutPageHtml } from './auth/pages.mjs'
 
 const log = (msg) => console.log(pc.cyan('mdbook'), msg)
 
@@ -230,10 +230,11 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
     console.log(`${ip} ${user || '-'} ${req.method} ${req.url} ${status}${note ? ` ${note}` : ''}`)
   }
 
-  // Paths handled as endpoints. Everything else under /auth/ (the generated
-  // `signed-out` and `denied` pages) is an ordinary file — intercepting the
-  // whole prefix 404'd the page the provider redirects to after logout.
-  const AUTH_ENDPOINTS = new Set(['/auth/session', '/auth/login', '/auth/callback', '/auth/logout'])
+  // Paths handled here rather than resolved against the dist. `signed-out` is
+  // among them because it is rendered, not built (auth/pages.mjs); the prefix
+  // as a whole is deliberately not intercepted, so anything else under /auth/
+  // still resolves as a file.
+  const AUTH_ENDPOINTS = new Set(['/auth/session', '/auth/login', '/auth/callback', '/auth/logout', '/auth/signed-out'])
 
   // ---- OIDC endpoints (verify mode) ----
   async function handleAuth(req, res, url, session) {
@@ -248,6 +249,16 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
         { 'Cache-Control': 'no-store' }
       )
     }
+    // Rendered here, not built: whoever lands on it has just signed out, so on
+    // a gated site the theme bundle is refused to them and a built page would
+    // arrive unstyled. Same reasoning as the 403 body — see auth/pages.mjs.
+    if (url.pathname === '/auth/signed-out') {
+      access(req, res, 200, null, 'signed-out-landing')
+      return send(res, 200, signedOutPageHtml({ siteTitle, base }), 'text/html; charset=utf-8', {
+        'Cache-Control': 'no-store'
+      })
+    }
+
     if (trust) return send(res, 404, 'not found') // gateway owns login/logout
     if (!auth?.issuer || !auth?.clientId) {
       return send(res, 500, 'auth.issuer / auth.clientId not configured')
@@ -417,7 +428,11 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
             base,
             user: session.name,
             roles: session.roles || [],
-            required: requirement
+            required: requirement,
+            // Offer "back to the site" only if the site root is somewhere this
+            // reader can actually land. On a wholly gated site it is not, and
+            // the link would come straight back to this page.
+            homeAllowed: isAllowed(requirementFor(acl, '/'), session)
           }),
           'text/html; charset=utf-8',
           { 'Cache-Control': 'no-store' }
