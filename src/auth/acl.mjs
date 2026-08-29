@@ -68,6 +68,12 @@ export function requirementFor(manifest, route) {
   let r = String(route)
   if (!r.startsWith('/')) r = '/' + r
   r = r.replace(/\.html$/i, '').replace(/\/index$/, '/')
+  // The sign-in machinery is never content, so it never inherits the site
+  // default. It used to: on a site whose default is a role, `/auth/signed-out`
+  // required that role, so signing out bounced the (now anonymous) reader
+  // straight back to the login page instead of showing that they had signed
+  // out. These pages carry no documentation — only the words on them.
+  if (r === '/auth' || r.startsWith('/auth/')) return 'public'
   const page = manifest.pages?.[r] ?? manifest.pages?.[r.replace(/\/$/, '') || '/']
   if (page) return page
   for (const a of manifest.assets || []) {
