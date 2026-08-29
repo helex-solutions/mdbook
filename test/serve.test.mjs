@@ -6,7 +6,8 @@ import path from 'node:path'
 import http from 'node:http'
 import { createHandler, createSessionCodec, rolesFromClaims } from '../src/serve.mjs'
 
-// A minimal built dist: public page, protected page, denied page, asset.
+// A minimal built dist: public page, protected page, asset. No auth/denied.html
+// — the 403 body is rendered by serve itself, not built.
 function makeDist() {
   const dist = fs.mkdtempSync(path.join(os.tmpdir(), 'mdbook-serve-'))
   const w = (p, c) => {
@@ -16,7 +17,6 @@ function makeDist() {
   w('index.html', '<h1>home</h1>')
   w('open.html', '<h1>open</h1>')
   w('internal/secret.html', '<h1>secret</h1>')
-  w('auth/denied.html', '<h1>denied</h1>')
   w('auth/signed-out.html', '<h1>signed out</h1>')
   w('404.html', '<h1>nope</h1>')
   w('attachments/42/pic.png', 'PNG')
@@ -109,7 +109,7 @@ test('trust-proxy mode: enforcement from gateway headers', async () => {
       'X-Auth-Request-Groups': 'viewer'
     })
     assert.equal(denied.status, 403)
-    assert.match(await denied.text(), /denied/)
+    assert.match(await denied.text(), /Access denied/)
     // Protected asset follows its page.
     assert.equal((await get(port, '/attachments/42/pic.png')).status, 302)
     assert.equal(
@@ -258,7 +258,6 @@ test('generated pages under /auth/ are served, not swallowed by the endpoints', 
     assert.equal(out.status, 200)
     assert.match(await out.text(), /signed out/)
     assert.equal(out.headers.get('cache-control'), 'no-store')
-    assert.equal((await get(port, '/auth/denied')).status, 200)
     // Real endpoints still behave as endpoints.
     assert.equal((await get(port, '/auth/session')).status, 401)
   } finally {
@@ -477,5 +476,85 @@ test('OIDC verify mode: full login roundtrip against a mock IdP', async () => {
   } finally {
     server.close()
     idp.close()
+  }
+})
+
+// A site whose default access is a role — the shape that broke the denied page.
+const ROLE_DEFAULT_ACL = { default: ['viewer'], rules: [], pages: {}, assets: [] }
+
+const TRUST_AUTH = {
+  access: ['viewer'],
+  trustProxy: { userHeader: 'X-Auth-Request-User', rolesHeader: 'X-Auth-Request-Groups' },
+  session: { maxAge: 3600 }
+}
+
+test('denied page is self-contained: no external CSS or JS to be 403d', async () => {
+  const dist = makeDist()
+  const { server, port } = await serve(
+    createHandler({ dist, acl: ROLE_DEFAULT_ACL, auth: TRUST_AUTH, quiet: true, siteTitle: 'EMR Documentation' })
+  )
+  try {
+    const res = await get(port, '/open', { 'X-Auth-Request-User': 'bob', 'X-Auth-Request-Groups': 'other' })
+    assert.equal(res.status, 403)
+    assert.match(res.headers.get('content-type'), /text\/html/)
+    assert.equal(res.headers.get('cache-control'), 'no-store')
+    const html = await res.text()
+
+    // The whole point: nothing to fetch, so nothing that can come back 403.
+    assert.ok(!/<link[^>]+stylesheet/i.test(html), 'must not link an external stylesheet')
+    assert.ok(!/<script/i.test(html), 'must not load or run script')
+    assert.match(html, /<style>/)
+
+    // And it says something useful.
+    assert.match(html, /Access denied/)
+    assert.match(html, /EMR Documentation/)
+    assert.match(html, /bob/)
+    assert.match(html, /viewer/) // the role they were missing
+
+    // The theme bundle stays gated — fixing the page by publishing /assets/
+    // would publish every gated page's content chunk with it.
+    const asset = await get(port, '/assets/app.js', {
+      'X-Auth-Request-User': 'bob',
+      'X-Auth-Request-Groups': 'other'
+    })
+    assert.equal(asset.status, 403)
+  } finally {
+    server.close()
+  }
+})
+
+test('denied page escapes identity taken from token claims', async () => {
+  const dist = makeDist()
+  const { server, port } = await serve(
+    createHandler({ dist, acl: ROLE_DEFAULT_ACL, auth: TRUST_AUTH, quiet: true })
+  )
+  try {
+    const res = await get(port, '/open', {
+      'X-Auth-Request-User': '<script>alert(1)</script>',
+      'X-Auth-Request-Groups': 'other'
+    })
+    const html = await res.text()
+    assert.ok(!html.includes('<script>alert(1)</script>'), 'claim must not be injected as markup')
+    assert.match(html, /&lt;script&gt;/)
+  } finally {
+    server.close()
+  }
+})
+
+test('auth pages never inherit a role site-default', async () => {
+  const dist = makeDist()
+  const { server, port } = await serve(
+    createHandler({ dist, acl: ROLE_DEFAULT_ACL, auth: TRUST_AUTH, quiet: true })
+  )
+  try {
+    // Anonymous, because signing out is exactly when the session is gone. This
+    // used to redirect to /auth/login, so sign-out never showed its landing.
+    const out = await get(port, '/auth/signed-out')
+    assert.equal(out.status, 200)
+    assert.match(await out.text(), /signed out/)
+    // Ordinary content is still gated.
+    assert.equal((await get(port, '/open')).status, 302)
+  } finally {
+    server.close()
   }
 })

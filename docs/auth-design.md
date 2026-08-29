@@ -118,8 +118,17 @@ The build stays static-host-compatible; auth adds metadata, it does not change p
 2. **Search exclusion** — every protected page gets `search: false` frontmatter (the existing
    lever, already used for redirect stubs and the OAuth callback page), so the VitePress local
    search chunk (`assets/chunks/@localSearchIndex*.js`) never contains protected text.
-3. **Generated pages** — following the OAuth-callback-page pattern in `src/build.mjs`: a login
-   landing page and a 403 page, both `search: false`.
+3. **Generated pages** — following the OAuth-callback-page pattern in `src/build.mjs`: a
+   post-logout landing page, `search: false`. Routes under `/auth/` are always `public` in the
+   manifest: they hold no documentation, and inheriting a role site-default meant a reader who
+   had just signed out was bounced from the "Signed out" page back to the login page.
+
+   The **403 page is not generated** — `serve` renders it itself, self-contained, from
+   `src/auth/denied-page.mjs`. It has to be: a reader who fails the ACL fails it for the theme
+   bundle too (under a role site-default, `/assets/` is protected like everything else), so a
+   built page would arrive with its stylesheet and scripts 403'd and render as raw markup.
+   Publishing `/assets/` instead is not available — VitePress emits one content chunk per page
+   there, so that would publish every gated page.
 
 ### Leak model (v1)
 
@@ -165,8 +174,8 @@ entry point for any site with protected content.
   session is alive). **Silent renewal is designed-for, post-v1**: the code exchange is
   server-side, so `serve` can keep the refresh token and extend sessions sliding-window-style —
   server state only, no cookie-format or endpoint change.
-- Per request: route → `acl.json` → serve | `302` to `/auth/login` (anonymous) | `403` page
-  (authenticated, missing role).
+- Per request: route → `acl.json` → serve | `302` to `/auth/login` (anonymous) | self-contained
+  `403` page naming the missing role (authenticated, missing role).
 - Multi-issuer: `auth.issuers` maps issuer → JWKS; keys selected by issuer + `kid`, JWKS cached
   per issuer, failed fetches never cached.
 - Access log includes the username and the ACL decision — the attachment point for

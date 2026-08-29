@@ -16,6 +16,7 @@ import crypto from 'node:crypto'
 import pc from 'picocolors'
 import { loadConfig } from './config.mjs'
 import { requirementFor, isAllowed } from './auth/acl.mjs'
+import { deniedPageHtml } from './auth/denied-page.mjs'
 
 const log = (msg) => console.log(pc.cyan('mdbook'), msg)
 
@@ -194,7 +195,7 @@ function resolveFile(dist, route) {
 }
 
 // Exported for tests: builds the request handler from resolved pieces.
-export function createHandler({ dist, base = '/', acl = null, auth = null, codec = null, quiet = false }) {
+export function createHandler({ dist, base = '/', acl = null, auth = null, codec = null, quiet = false, siteTitle = 'Documentation' }) {
   const trust = auth?.trustProxy || null
   let verifyBearer = null // lazy — jose is only imported when needed
 
@@ -406,9 +407,21 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
           return send(res, 302, '', 'text/plain', { Location: `${base}auth/login?returnTo=${returnTo}` })
         }
         access(req, res, 403, session.name)
-        const denied = resolveFile(dist, '/auth/denied')
-        if (denied) return serveFile(res, denied, 403)
-        return send(res, 403, 'access denied')
+        // Self-contained by necessity: this reader is denied the theme bundle
+        // too, so a page built from it would arrive unstyled. See denied-page.mjs.
+        return send(
+          res,
+          403,
+          deniedPageHtml({
+            siteTitle,
+            base,
+            user: session.name,
+            roles: session.roles || [],
+            required: requirement
+          }),
+          'text/html; charset=utf-8',
+          { 'Cache-Control': 'no-store' }
+        )
       }
 
       const file = resolveFile(dist, route)
@@ -462,7 +475,7 @@ export async function serveSite(projectRoot, overrides = {}) {
     log(`auth: default access "${Array.isArray(auth.access) ? auth.access.join(',') : auth.access}", ${Object.keys(acl.pages).length} protected page(s), ${acl.rules.length} rule(s)`)
   }
 
-  const handler = createHandler({ dist, base: cfg.site.base, acl, auth, codec })
+  const handler = createHandler({ dist, base: cfg.site.base, acl, auth, codec, siteTitle: cfg.site.title })
   const server = http.createServer(handler)
   const port = overrides.port || 8080
   const host = overrides.host === true ? '0.0.0.0' : overrides.host || '127.0.0.1'
