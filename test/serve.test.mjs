@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import http from 'node:http'
-import { createHandler, createSessionCodec, rolesFromClaims } from '../src/serve.mjs'
+import { createHandler, createSessionCodec, rolesFromClaims, safeReturnTo } from '../src/serve.mjs'
 
 // A minimal built dist: public page, protected page, asset. Nothing under
 // auth/ — both auth pages are rendered by serve itself, not built.
@@ -613,4 +613,18 @@ test('auth pages never inherit a role site-default', async () => {
   } finally {
     server.close()
   }
+})
+
+test('login return target falls back to the site base, not the server root', () => {
+  // A site under a path shares its host with other things — on docs.helex.org
+  // that is a different site at /. A login with no returnTo (the "Sign in
+  // again" link on the signed-out page) must not land there.
+  assert.equal(safeReturnTo(null, '/emr/'), '/emr/')
+  assert.equal(safeReturnTo('', '/emr/'), '/emr/')
+  assert.equal(safeReturnTo('/emr/architecture/', '/emr/'), '/emr/architecture/')
+  // Off-site targets are still refused, and refused *to the base*.
+  assert.equal(safeReturnTo('//evil.example.com', '/emr/'), '/emr/')
+  assert.equal(safeReturnTo('https://evil.example.com', '/emr/'), '/emr/')
+  // Root-hosted sites are unchanged.
+  assert.equal(safeReturnTo(null), '/')
 })
