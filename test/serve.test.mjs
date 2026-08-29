@@ -6,8 +6,8 @@ import path from 'node:path'
 import http from 'node:http'
 import { createHandler, createSessionCodec, rolesFromClaims } from '../src/serve.mjs'
 
-// A minimal built dist: public page, protected page, asset. No auth/denied.html
-// — the 403 body is rendered by serve itself, not built.
+// A minimal built dist: public page, protected page, asset. Nothing under
+// auth/ — both auth pages are rendered by serve itself, not built.
 function makeDist() {
   const dist = fs.mkdtempSync(path.join(os.tmpdir(), 'mdbook-serve-'))
   const w = (p, c) => {
@@ -17,7 +17,6 @@ function makeDist() {
   w('index.html', '<h1>home</h1>')
   w('open.html', '<h1>open</h1>')
   w('internal/secret.html', '<h1>secret</h1>')
-  w('auth/signed-out.html', '<h1>signed out</h1>')
   w('404.html', '<h1>nope</h1>')
   w('attachments/42/pic.png', 'PNG')
   w('assets/app.js', 'js')
@@ -238,7 +237,7 @@ test('site base path is stripped for ACL and file lookup', async () => {
   }
 })
 
-test('generated pages under /auth/ are served, not swallowed by the endpoints', async () => {
+test('the post-logout landing is served, not swallowed by the endpoints', async () => {
   const dist = makeDist()
   const codec = createSessionCodec('s')
   const auth = {
@@ -253,7 +252,8 @@ test('generated pages under /auth/ are served, not swallowed by the endpoints', 
   }
   const { server, port } = await serve(createHandler({ dist, acl: ACL, auth, codec, quiet: true }))
   try {
-    // The page the provider redirects to after logout must not 404.
+    // The page the provider redirects to after logout must not 404 — the whole
+    // /auth/ prefix used to be intercepted as endpoints, which 404'd it.
     const out = await get(port, '/auth/signed-out')
     assert.equal(out.status, 200)
     assert.match(await out.text(), /signed out/)
@@ -538,6 +538,62 @@ test('denied page escapes identity taken from token claims', async () => {
     assert.match(html, /&lt;script&gt;/)
   } finally {
     server.close()
+  }
+})
+
+test('signed-out landing is self-contained and reachable when anonymous', async () => {
+  const dist = makeDist()
+  const { server, port } = await serve(
+    createHandler({ dist, acl: ROLE_DEFAULT_ACL, auth: TRUST_AUTH, quiet: true, siteTitle: 'EMR Documentation' })
+  )
+  try {
+    // Anonymous, because signing out is exactly when the session is gone. This
+    // used to redirect to /auth/login, so the landing was never seen; then it
+    // was seen but built from a bundle the anonymous reader could not fetch.
+    const res = await get(port, '/auth/signed-out')
+    assert.equal(res.status, 200)
+    assert.match(res.headers.get('content-type'), /text\/html/)
+    const html = await res.text()
+    assert.ok(!/<link[^>]+stylesheet/i.test(html), 'must not link an external stylesheet')
+    assert.ok(!/<script/i.test(html), 'must not load or run script')
+    assert.match(html, /Signed out/)
+    assert.match(html, /EMR Documentation/)
+    // Ordinary content is still gated.
+    assert.equal((await get(port, '/open')).status, 302)
+  } finally {
+    server.close()
+  }
+})
+
+test('denied page omits the home link when the site root is denied too', async () => {
+  const dist = makeDist()
+  // Wholly gated: '/' is not public, so "Back to the site" would come straight
+  // back to this page.
+  const gated = await serve(
+    createHandler({ dist, acl: ROLE_DEFAULT_ACL, auth: TRUST_AUTH, quiet: true })
+  )
+  try {
+    const html = await (
+      await get(gated.port, '/open', { 'X-Auth-Request-User': 'bob', 'X-Auth-Request-Groups': 'other' })
+    ).text()
+    assert.ok(!/Back to the site/.test(html), 'no dead link when the root is denied')
+    assert.match(html, /Sign in as someone else/)
+  } finally {
+    gated.server.close()
+  }
+
+  // Public root, one gated section: the link now leads somewhere readable.
+  const mixed = await serve(createHandler({ dist, acl: ACL, auth: TRUST_AUTH, quiet: true }))
+  try {
+    const html = await (
+      await get(mixed.port, '/internal/secret', {
+        'X-Auth-Request-User': 'bob',
+        'X-Auth-Request-Groups': 'viewer'
+      })
+    ).text()
+    assert.match(html, /Back to the site/)
+  } finally {
+    mixed.server.close()
   }
 })
 

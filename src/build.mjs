@@ -242,25 +242,12 @@ function stageContent(cfg, model, openapiSpecs = {}) {
     }
   }
 
-  // The post-logout landing. Same generated-page pattern as the OAuth callback.
-  //
-  // There is deliberately no `denied.md` alongside it: the 403 body is rendered
-  // by `mdbook serve` itself (src/auth/denied-page.mjs), because a reader who is
-  // denied the site is denied its theme bundle too and a built page would reach
-  // them unstyled.
-  //
-  // The link is written with the site base — VitePress rewrites markdown links
-  // for `base`, but not hrefs inside raw HTML, so `/auth/login` would 404 on a
-  // site served under a path.
+  // No auth pages are generated. The 403 body and the post-logout landing are
+  // rendered by `mdbook serve` itself (src/auth/pages.mjs), because both are
+  // shown to someone the ACL is refusing — a reader without the role, or one
+  // who has just signed out and is anonymous again. On a gated site the theme
+  // bundle is refused to them too, so a built page would reach them unstyled.
   if (cfg.auth) {
-    const authDir = path.join(staging, 'auth')
-    fs.mkdirSync(authDir, { recursive: true })
-    fs.writeFileSync(
-      path.join(authDir, 'signed-out.md'),
-      '---\ntitle: Signed out\nsearch: false\naside: false\n---\n\n# Signed out\n\n' +
-        'You have been signed out.\n\n' +
-        `<p><a href="${cfg.site.base}auth/login">Sign in again</a></p>\n`
-    )
     cfg.aclManifest = buildAclManifest({
       entries: aclEntries,
       rules: cfg.auth.rules,
