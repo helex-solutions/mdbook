@@ -168,8 +168,14 @@ function originFor(req, auth) {
   return `${proto}://${host}`
 }
 
-// Only same-site relative paths may be a login return target.
-const safeReturnTo = (v) => (v && v.startsWith('/') && !v.startsWith('//') ? v : '/')
+// Only same-site relative paths may be a login return target. The fallback is
+// the site's own base, not the server root: on a site mounted under a path
+// (`base: /emr/`) a login carrying no returnTo — which is what the "Sign in
+// again" link on the signed-out page produces — would otherwise land the reader
+// on `/`, i.e. off the documentation entirely and onto whatever else the host
+// serves there.
+export const safeReturnTo = (v, base = '/') =>
+  v && v.startsWith('/') && !v.startsWith('//') ? v : base
 
 function send(res, status, body, type = 'text/plain; charset=utf-8', extra = {}) {
   res.writeHead(status, { 'Content-Type': type, ...extra })
@@ -273,7 +279,7 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
       const state = b64url(crypto.randomBytes(16))
       const verifier = b64url(crypto.randomBytes(48))
       const challenge = b64url(crypto.createHash('sha256').update(verifier).digest())
-      const returnTo = safeReturnTo(url.searchParams.get('returnTo'))
+      const returnTo = safeReturnTo(url.searchParams.get('returnTo'), base)
       setCookie(res, 'mdbook-pkce', codec.sign({ state, verifier, returnTo, exp: Date.now() / 1000 + 600 }), {
         path: `${base}auth`,
         secure
@@ -350,7 +356,7 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
       setCookie(res, 'mdbook-pkce', '', { path: `${base}auth`, clear: true })
       setCookie(res, 'mdbook-session', codec.sign(session), { path: base, maxAge: auth.session.maxAge, secure })
       access(req, res, 302, session.name, 'signed-in')
-      return send(res, 302, '', 'text/plain', { Location: safeReturnTo(pkce.returnTo) })
+      return send(res, 302, '', 'text/plain', { Location: safeReturnTo(pkce.returnTo, base) })
     }
 
     if (url.pathname === '/auth/logout') {
