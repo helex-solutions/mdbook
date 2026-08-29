@@ -1,0 +1,124 @@
+name: Docker image
+
+# Manual only. The image is a release artifact — one generic runtime that every
+# installation pulls — so publishing is a deliberate act, not a side effect of
+# every push. Dispatch from the git ref you want built (a release tag, usually).
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag (default: the git tag without "v", else <branch>-<short sha>)'
+        type: string
+        default: ''
+      latest:
+        description: 'Also publish :latest — README documents the untagged pull, so a release should tick this'
+        type: boolean
+        default: false
+      push:
+        description: 'Push to ghcr.io (untick to only build and smoke-test)'
+        type: boolean
+        default: true
+      platforms:
+        description: 'Target platforms — arm64 is emulated, so it roughly doubles the build'
+        type: choice
+        options:
+          - linux/amd64
+          - linux/amd64,linux/arm64
+        default: linux/amd64
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve image tags
+        id: tags
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+          INPUT_TAG: ${{ inputs.tag }}
+          LATEST: ${{ inputs.latest }}
+        run: |
+          set -eu
+          image=$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]')  # ghcr rejects uppercase
+          tag=$INPUT_TAG
+          if [ -z "$tag" ]; then
+            if [ "$GITHUB_REF_TYPE" = tag ]; then
+              tag=${GITHUB_REF_NAME#v}
+            else
+              tag="$(printf '%s' "$GITHUB_REF_NAME" | tr '/' '-')-$(git rev-parse --short HEAD)"
+            fi
+          fi
+          case $tag in
+            [!A-Za-z0-9_]* | *[!A-Za-z0-9_.-]*)
+              echo "::error::'$tag' is not a valid image tag" >&2; exit 1 ;;
+          esac
+          tags="$image:$tag"
+          if [ "$LATEST" = true ]; then tags="$tags,$image:latest"; fi
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+          echo "Publishing: $tags"
+
+      # Only the multi-platform push needs emulation; installing binfmt is
+      # cheap enough not to bother making it conditional.
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      # Build for this runner's architecture first and keep it locally, so the
+      # smoke test below exercises a real image before anything is published.
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: mdbook:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The Dockerfile copies a subset of the tree and drops privileges, so the
+      # failure modes worth catching are a missing file and an unwritable volume
+      # — both of which only show up when the container actually serves a site.
+      - name: Smoke-test the image against demo/
+        run: |
+          set -eu
+          sudo chown -R 10001:10001 demo   # MDBOOK_BUILD writes .mdbook/ into the volume
+          docker run -d --name smoke -p 8080:8080 -e MDBOOK_BUILD=1 \
+            -v "$PWD/demo:/site" mdbook:smoke
+          for _ in $(seq 60); do
+            if curl -fsS -o /tmp/home.html http://127.0.0.1:8080/ && grep -qi '<title' /tmp/home.html; then
+              echo "served: $(grep -o '<title>[^<]*' /tmp/home.html)"
+              exit 0
+            fi
+            [ "$(docker inspect -f '{{.State.Running}}' smoke)" = true ] || break
+            sleep 2
+          done
+          echo '::error::the container never served the demo site'
+          docker logs smoke
+          exit 1
+
+      - name: Log in to ghcr.io
+        if: inputs.push
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Rebuilt rather than retagged: the push may cover platforms the smoke
+      # test's single-arch image does not. Layers come from the cache above.
+      - name: Push
+        if: inputs.push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          platforms: ${{ inputs.platforms }}
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

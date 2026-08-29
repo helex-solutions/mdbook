@@ -515,7 +515,9 @@ site: either build in CI and mount the result — the mount can then be read-onl
 one-shot build is `docker run -v /srv/docs/mysite:/site ghcr.io/helex-solutions/mdbook build`.
 See [`docker-compose.example.yml`](docker-compose.example.yml) and
 [`docs/deployment.md`](docs/deployment.md); a live example runs at
-[tx.helex.dev/mdbook](https://tx.helex.dev/mdbook/) from [`demo/`](demo).
+[tx.helex.dev/mdbook](https://tx.helex.dev/mdbook/) from [`demo/`](demo). Tags are
+published on demand by the *Docker image* workflow — see
+[publishing the image](docs/deployment.md#publishing-the-image).
 
 Put nginx in front for TLS; when the site is mounted under a path, set `site.base` to match:
 
