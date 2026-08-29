@@ -64,6 +64,22 @@ location /mdbook/ {
 (used for OIDC redirect URIs), so pass both; `auth.publicUrl` overrides them when a
 proxy cannot send them.
 
+## Publishing the image
+
+`ghcr.io/helex-solutions/mdbook` comes from the **Docker image** workflow, which runs
+only on demand — Actions → *Docker image* → *Run workflow*, dispatched from the ref you
+want built (a release tag, normally):
+
+| Input | Default | Meaning |
+|---|---|---|
+| `tag` | *(empty)* | image tag; empty derives one from the ref — `v1.5.0` → `1.5.0`, a branch → `<branch>-<short sha>` |
+| `latest` | off | also publish `:latest`, which is what the untagged pull above resolves to |
+| `push` | on | untick to build and smoke-test without touching the registry |
+| `platforms` | `linux/amd64` | add `linux/arm64` for Apple-silicon hosts; it is emulated, so it roughly doubles the build |
+
+Every run builds the image and serves [`demo/`](../demo) from it before pushing, so a
+broken entry point or a missing `COPY` fails the run rather than the registry.
+
 ## Publishing from CI
 
 The GitHub Action can rsync the built site to the server after a build:
