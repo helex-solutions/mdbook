@@ -128,3 +128,36 @@ export function readAccessFrontmatter(text) {
   }
   return roles.length ? roles : null
 }
+
+// Which pages may go into the local search index.
+//
+// The index ships as ONE static chunk (`assets/chunks/@localSearchIndex*.js`),
+// so everyone who can fetch that chunk can read the title and body text of
+// every page inside it. `serve` gates the chunk like any other file, and
+// `SEARCH_INDEX_PREFIX` is pinned in the manifest at the site default — so the
+// chunk's audience is exactly "sessions that satisfy the site default".
+//
+// A page is therefore safe to index only when every session that can fetch the
+// chunk can also open the page: the page must be no stricter than the site
+// default. Excluding protected pages outright (v1) was safe but left a wholly
+// gated site with an empty index — nothing was public, so nothing was indexed.
+//
+// Both arguments are 'public' | 'authenticated' | [role, …].
+export function isSearchable(access, siteDefault) {
+  const page = access || 'public'
+  const chunk = siteDefault || 'public'
+  // A public page is readable by everyone, so it is safe in any chunk.
+  if (page === 'public') return true
+  // A public chunk can hold nothing but public pages.
+  if (chunk === 'public') return false
+  // The chunk needs at least a session, and any session satisfies the page.
+  if (page === 'authenticated') return true
+  // The page needs roles the chunk does not ask for.
+  if (chunk === 'authenticated') return false
+  // Both are role sets: every role that opens the chunk must also open the page.
+  return chunk.every((r) => page.includes(r))
+}
+
+// Prefix of the generated search-index chunk, pinned in acl.json so the chunk's
+// requirement is the site default whatever else the rules say.
+export const SEARCH_INDEX_PREFIX = '/assets/chunks/@localSearchIndex'

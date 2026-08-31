@@ -19,7 +19,13 @@ import { expandStructureDefinitions } from './ingest/structure-definition.mjs'
 import { expandConceptMatrices } from './ingest/concept-matrix.mjs'
 import { loadOpenapiSpecs, authFromSchemes } from './ingest/openapi.mjs'
 import { expandOpenapi } from './ingest/openapi-render.mjs'
-import { resolveAccess, readAccessFrontmatter, buildAclManifest } from './auth/acl.mjs'
+import {
+  resolveAccess,
+  readAccessFrontmatter,
+  buildAclManifest,
+  isSearchable,
+  SEARCH_INDEX_PREFIX
+} from './auth/acl.mjs'
 import { normalizeAccess } from './auth/config.mjs'
 
 const MDBOOK_SRC = path.dirname(fileURLToPath(import.meta.url)) // .../mdbook/src
@@ -132,7 +138,9 @@ function breadcrumbsFor(dest, folderLabels, destSet, base = '/') {
   return crumbs
 }
 
-function stageContent(cfg, model, openapiSpecs = {}) {
+// Exported for tests: staging is where a page's access is resolved and where the
+// search-index decision is made, so the rule is exercised without a full build.
+export function stageContent(cfg, model, openapiSpecs = {}) {
   const staging = cfg.build.staging
   fs.rmSync(staging, { recursive: true, force: true })
   fs.mkdirSync(staging, { recursive: true })
@@ -219,8 +227,9 @@ function stageContent(cfg, model, openapiSpecs = {}) {
       if (f.tags?.length) extra.keywords = f.tags
       // Keep hand-picked pages out of the search index (they stay published).
       if (isSearchExcluded(f.dest)) extra.search = false
-      // A protected page must never reach the public search-index chunk.
-      if (isProtected(access)) extra.search = false
+      // A page must never reach a search-index chunk that a reader who cannot
+      // open the page is allowed to fetch (see isSearchable in auth/acl.mjs).
+      if (aclOpts && !isSearchable(access, aclOpts.siteDefault)) extra.search = false
       // Where am I / what else covers this — resolved at build time so the theme
       // only has to render, and pages carry no extra client-side lookup cost.
       const crumbs = breadcrumbsFor(f.dest, model.folderLabels, destSet, cfg.site.base)
@@ -248,10 +257,13 @@ function stageContent(cfg, model, openapiSpecs = {}) {
   // who has just signed out and is anonymous again. On a gated site the theme
   // bundle is refused to them too, so a built page would reach them unstyled.
   if (cfg.auth) {
+    // Pin the search-index chunk at the site default, so its audience is the one
+    // the indexing decision above assumed — never widened by an `/assets/` rule.
+    const searchAssets = [{ prefix: SEARCH_INDEX_PREFIX, access: cfg.auth.access }]
     cfg.aclManifest = buildAclManifest({
       entries: aclEntries,
       rules: cfg.auth.rules,
-      assets: aclAssets,
+      assets: [...aclAssets, ...searchAssets],
       siteDefault: cfg.auth.access
     })
   }

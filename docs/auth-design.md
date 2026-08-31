@@ -115,9 +115,22 @@ The build stays static-host-compatible; auth adds metadata, it does not change p
 
    The `assets` block covers attachments belonging to protected termx pages (attachments are
    keyed by page id), so images embedded in a protected page inherit its ACL.
-2. **Search exclusion** — every protected page gets `search: false` frontmatter (the existing
-   lever, already used for redirect stubs and the OAuth callback page), so the VitePress local
-   search chunk (`assets/chunks/@localSearchIndex*.js`) never contains protected text.
+2. **Search exclusion** — VitePress emits one local search chunk for the whole site
+   (`assets/chunks/@localSearchIndex*.js`), so whoever can fetch that chunk can read the title
+   and body text of every page in it. The chunk's prefix is pinned in `acl.json` at the site
+   default, which makes its audience exactly "sessions that satisfy the site default"; a page is
+   then indexed only when that audience can also open the page (`isSearchable`, `auth/acl.mjs`).
+   Pages that fail the test get `search: false` frontmatter — the existing lever, already used
+   for redirect stubs and the OAuth callback page.
+
+   So on a public site only public pages are indexed; on a site gated at `viewer` every `viewer`
+   page is indexed and an `admin`-only page is not. The first cut excluded every protected page
+   outright, which was safe but left a wholly gated site with an empty index — nothing was
+   public, so nothing was indexed, and search returned no results for anything.
+
+   The cost is that a stricter page stays unsearchable even for readers who *can* open it. The
+   fix is per-audience index chunks (one index per distinct access set, the matching one served
+   per session); it needs the theme to stop importing VitePress's hardcoded index path.
 3. **Auth pages are not built** — the 403 body and the post-logout landing are rendered by
    `serve` itself, self-contained (inline CSS, no scripts), from `src/auth/pages.mjs`.
 
@@ -137,7 +150,8 @@ The build stays static-host-compatible; auth adds metadata, it does not change p
 
 ### Leak model (v1)
 
-Content, assets and search: never leak — enforced per request. Sidebar/nav **titles** of
+Content, assets and search: never leak — enforced per request. Search additionally never
+carries text a reader of the index chunk could not open directly. Sidebar/nav **titles** of
 protected pages are baked into the JS bundle and hidden client-side per session — a known,
 accepted v1 leak (documented to users). Follow-ups that remove it: per-session menu delivery,
 or fully separate per-audience builds.
