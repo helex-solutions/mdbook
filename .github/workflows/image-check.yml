@@ -1,0 +1,55 @@
+name: Image builds
+
+# The image is published by a manual workflow, because a release artifact should
+# not fall out of every push (`docker.yml`). The cost of that deliberateness is
+# that nothing notices when an ordinary change breaks the image: removing the
+# vendored viewer left a `COPY vendor ./vendor` behind, CI stayed green because
+# no test builds an image, and the break surfaced only at the next publish.
+#
+# So: build on the pull requests that could plausibly break it, and never push.
+# Publishing stays exactly as manual as it was.
+on:
+  pull_request:
+    paths:
+      # The recipe itself, and everything it COPYs — a deleted or renamed path
+      # is the failure mode this exists for, so the list must track the COPY
+      # lines rather than being a guess at "docker-ish files".
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'bin/**'
+      - 'src/**'
+      - 'docker-entrypoint.sh'
+      - '.github/workflows/image-check.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build (never pushed)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          push: false
+          tags: mdbook:pr
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Deliberately a BUILD rather than the serve smoke `docker.yml` runs: this
+      # answers "can the image do its job at all", the release check answers
+      # "does it serve", and two copies of one script would drift. A container
+      # that starts and prints --help proves neither.
+      - name: Build the demo site inside the image
+        run: |
+          set -eu
+          sudo chown -R 10001:10001 demo   # the image drops privileges; /site must be writable
+          docker run --rm -v "$PWD/demo:/site" mdbook:pr build --project /site
+          test -s demo/.mdbook/dist/index.html || {
+            echo '::error::the image built no site'; exit 1;
+          }
+          echo "built: $(wc -c < demo/.mdbook/dist/index.html) bytes of index.html"
