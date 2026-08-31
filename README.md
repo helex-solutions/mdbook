@@ -1,11 +1,11 @@
 # mdbook
 
 A Markdown + metadata static-site generator for tutorials, specifications and books.
-It turns **TermX Wiki** exports and **GitBook** repositories into a fast, searchable,
+It turns **Owliki** exports and **GitBook** repositories into a fast, searchable,
 themeable, multilingual website — and ships as a **GitHub Action**.
 
-Built on [VitePress](https://vitepress.dev) (which uses `markdown-it`), so the TermX
-Wiki "smart text" runs natively.
+Built on [VitePress](https://vitepress.dev) (which uses `markdown-it`), so Owliki's
+"smart text" runs natively.
 
 ## Showcase
 
@@ -32,18 +32,18 @@ Real sites built with mdbook — click a thumbnail for the live site (see
 - 🧭 **Menu** — nav & sidebar auto-generated from your content; extendable or overridable in config. On a plain folder tree each top-level section gets its own sidebar, folders sort before files, and a page can set `sidebarTitle` to keep its menu label short
 - 🧵 **Orientation at scale** — breadcrumbs above every page, and a **Related** block cross-linking the same document id across parallel trees (a spec ↔ its validation ↔ the story it traces from)
 - 🌍 **Multilingual** — first-class locales (default language at `/`, others under `/<lang>/`)
-- 🧩 **TermX smart-text** — callouts, tabsets, links-list/grid-list, `+++` collapsibles, `page:`/`cs:`/`vs:`/`concept:` links, `files/` images, page icons, GitBook card tables
+- 🧩 **Owliki smart-text** — callouts, tabsets, links-list/grid-list, `+++` collapsibles, `page:`/`cs:`/`vs:`/`concept:` links, `files/` images, page icons, GitBook card tables
 - 📊 **Diagrams** — draw.io (including the wiki's versioned `{{drawio:name}}` macro, which always resolves to the newest saved version), Mermaid, and PlantUML (opt-in server, see `diagrams:`)
 - 💻 **Code** — Shiki highlighting for every fenced block; a fence that cites a source file (```` ```43:58:src/Foo.java ````) is highlighted by the file's extension and captioned with the path
 - 📄 **PDFs** — a PDF stored in the repo is published like a page: listed in the menu, previewed inline and downloadable (see [PDFs](#pdfs))
 - 🌐 **OpenAPI** — render one or many OpenAPI 3.1 / 3.0 / Swagger 2.0 documents into searchable reference pages, from a whole document down to a single operation, with an optional try-it console authenticated via OpenID Connect (see [OpenAPI](#openapi))
 - 🔗 **Terminology** — `{{def:}}` StructureDefinition viewer, and `{{csc:}}`/`{{vsc:}}` concept tables fetched from a FHIR server at build time
-- 🏷️ **SEO** — per-page titles/descriptions, `sitemap.xml`, canonical + Open Graph/Twitter tags, JSON-LD and `robots.txt`. Descriptions, languages and site URL are read from the TermX export when authored (site URL also auto-detected in CI), with first-paragraph/CI inference as the fallback; page **tags** are emitted as `<meta name="keywords">`
+- 🏷️ **SEO** — per-page titles/descriptions, `sitemap.xml`, canonical + Open Graph/Twitter tags, JSON-LD and `robots.txt`. Descriptions, languages and site URL are read from the Owliki export when authored (site URL also auto-detected in CI), with first-paragraph/CI inference as the fallback; page **tags** are emitted as `<meta name="keywords">`
 - 💬 **Comments** — optional [Giscus](https://giscus.app) (GitHub Discussions) box per page (see [Comments](#comments-github-discussions))
 - 🖥️ **Presentation mode** — a fullscreen, chrome-free view with prev/next controls for showing pages to an audience (see [Presentation mode](#presentation-mode))
 - 🔍 **Zoom** — a −/+ control in the nav bar scales the article (80–200%, remembered per browser); pair it with `theme.wide` for dense reference tables
 - 🔐 **Authentication** — gate the site (or sections of it, or single pages) behind OpenID Connect (Keycloak), enforced server-side by `mdbook serve` (see [Authentication](#authentication))
-- 🗂️ **Multi-space portals** — compose several TermX wiki-ssg exports into one site, each space mounted under its own section with its own sidebar and access rules (see [Multi-space portals](#multi-space-portals))
+- 🗂️ **Multi-space portals** — compose several Owliki wiki-ssg exports into one site, each space mounted under its own section with its own sidebar and access rules (see [Multi-space portals](#multi-space-portals))
 
 See [`docs/owliki-compatibility.md`](docs/owliki-compatibility.md) for the full
 Owliki → mdbook feature matrix.
@@ -241,7 +241,7 @@ comments:
   categoryId: DIC_xxx
   mapping: owliki          # thread by the stable wiki page code (else: pathname, title, …)
 
-# TermX terminology (optional) — FHIR server for {{csc:}}/{{vsc:}} and cs:/vs: links.
+# Helex TX terminology (optional) — FHIR server for {{csc:}}/{{vsc:}} and cs:/vs: links.
 tx-server: https://your-helextx-host/api/fhir
 
 # Diagrams (optional). Mermaid and draw.io need nothing configured. A ```plantuml
@@ -350,7 +350,7 @@ under a **Related** block — so `specifications/acc/ACC.11-…` and
 (`ACC.11`, `ACC.11.3`) and dashed (`ACC-US-010`, `FLOW-BP-003`); pages without one simply get
 no Related block.
 
-**TermX layout.** A TermX Wiki export — or a hand-authored equivalent — is `space.json`
+**Owliki layout.** An Owliki export — or a hand-authored equivalent — is `space.json`
 (space metadata), `pages.json` (the page tree) and one markdown file per page. The metadata
 and page directories are configurable:
 
@@ -376,7 +376,7 @@ language (`name`, `slug`, `lang`):
 ]
 ```
 
-TermX page bodies use `breaks: true` (a single newline becomes `<br>`), so keep each
+Owliki page bodies use `breaks: true` (a single newline becomes `<br>`), so keep each
 paragraph on one line. Images are attachments: `![](files/<id>/<file>)` (served from
 `/attachments/…`). See **[helex-solutions/mdbook § reference projects](#reference-projects)**
 for complete, working `space.json` / `pages.json` examples.
@@ -601,7 +601,7 @@ source:
 
 Cross-space `page:<space>/<slug>` links resolve internally when the target space is mounted
 (by space code or mount key), attachments are namespaced per mount so page ids from different
-TermX instances cannot collide, and access control composes: portal-level `auth.rules` match
+Owliki instances cannot collide, and access control composes: portal-level `auth.rules` match
 mounted paths (`api/**`), a space's exported `ssg.auth` arrives as rules scoped to its mount,
 and per-page `access` works as everywhere else — one `acl.json`, one `serve` process, one login
 for the whole portal.
@@ -738,7 +738,7 @@ button is always available.
    (title, languages, per-locale sidebars, content files, assets).
 2. **Stage** — content is copied into a scratch VitePress project under `.mdbook/.cache/`,
    with a generated `.vitepress/config.mjs` and a theme entry for the selected skin;
-   TermX smart-text is transformed/expanded here.
+   Owliki smart-text is transformed/expanded here.
 3. **Build** — VitePress renders the static site to `.mdbook/dist`.
 
 ## Reference projects
