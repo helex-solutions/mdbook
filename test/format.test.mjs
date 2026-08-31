@@ -8,7 +8,7 @@ import { ingestOwliki } from '../src/ingest/owliki.mjs'
 
 // The source format is not just a config value: it gates the RENDER pipeline —
 // which adapter runs, `breaks:`, and the whole `isOwliki` branch in
-// `stageContent` that sanitizes, expands `{{def:}}` and resolves `{{drawio:}}`.
+// `stageContent` that sanitizes and resolves `{{drawio:}}`.
 // A format that resolved in config but never reached that branch would publish
 // raw macro text, and nothing would say so.
 //
