@@ -19,8 +19,8 @@ Real sites built with mdbook — click a thumbnail for the live site (see
 <td width="33%" valign="top"><a href="https://helex-solutions.github.io/ib-portfolio/"><img src="docs/assets/mdbook-portfolio.png" alt="Portfolio built with mdbook"></a></td>
 </tr>
 <tr>
-<td align="center"><a href="https://hl7.lt"><b>HL7 Lithuania Registry</b></a><br><sub>National FHIR IG registry · <code>termx</code> source</sub></td>
-<td align="center"><a href="https://termx-health.github.io/tutorial/"><b>TermX tutorial</b></a><br><sub>Docs with smart-text &amp; terminology · <code>termx</code> source</sub></td>
+<td align="center"><a href="https://hl7.lt"><b>HL7 Lithuania Registry</b></a><br><sub>National FHIR IG registry · <code>owliki</code> source</sub></td>
+<td align="center"><a href="https://termx-health.github.io/tutorial/"><b>TermX tutorial</b></a><br><sub>Docs with smart-text &amp; terminology · <code>owliki</code> source</sub></td>
 <td align="center"><a href="https://helex-solutions.github.io/ib-portfolio/"><b>Portfolio</b></a><br><sub>Personal site · <code>gitbook</code> source</sub></td>
 </tr>
 </table>
@@ -182,8 +182,7 @@ site:
   web: https://example.org     # optional: base for cs:/vs:/page: web links
 
 source:
-  format: gitbook              # gitbook | owliki  (auto-detected if omitted; `termx` is
-                               #   the former name of `owliki` and still works)
+  format: gitbook              # gitbook | owliki  (auto-detected if omitted)
   spaces:                      # owliki only — multi-space portal (see Multi-space portals)
     handbook: spaces/handbook  #   mount key -> wiki-ssg export dir
     api: spaces/api
@@ -285,8 +284,9 @@ build:
 | `gitbook` | `SUMMARY.md` | `README.md` (home) + `SUMMARY.md` (nav) + `.gitbook/assets` |
 | `owliki` | `pages.json` (in `__source/`, `input/`, or `source/`) | `space.json` + `pages.json` + page markdown (+ `attachments/`) |
 
-> `format: termx` is the former name of the `owliki` format and still works, so a site
-> published before the rename keeps building unchanged. New configs should say `owliki`.
+> **Renamed.** The wiki-export format's former name is **no longer accepted** — a config
+> still carrying it fails the build, naming the value to replace it with. Change
+> `source.format` to `owliki`; nothing else in the config changes.
 
 **Plain doc trees (no `SUMMARY.md`).** With the `gitbook` format, `SUMMARY.md` is optional:
 point mdbook at any folder of markdown and it builds a **per-section sidebar automatically**
@@ -380,7 +380,7 @@ locales under `/<lang>/…` (VitePress i18n); a language switcher appears automa
 
 - *gitbook*: add a `<lang>/` subdirectory with its own `SUMMARY.md` + `README.md` + pages
   (e.g. `lt/…`). `.gitbook/assets` is shared; slugs are parallel (`/build` ↔ `/lt/build`).
-- *termx*: each language has its own slug (from `pages.json`), so routes differ
+- *owliki*: each language has its own slug (from `pages.json`), so routes differ
   (`/build` ↔ `/lt/versijos`). mdbook generates **redirect stubs** so the language switcher
   still lands on the correct translation. Per-locale menu labels/links come from `locales`
   in the config.
