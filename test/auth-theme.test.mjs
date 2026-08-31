@@ -38,22 +38,25 @@ test('auth links opt out of the SPA router', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Giscus threading. `owliki` and `termx` are the same instruction under two
-// names and MUST produce the same term: a site that updates its config would
-// otherwise lose every discussion it has.
+// Giscus threading. `owliki` means "thread by the wiki's stable page code"; the
+// former name is no longer accepted and falls through to giscus untouched. The
+// TERM is the page code either way, so a site that updates that one config word
+// keeps every discussion it has.
 // ---------------------------------------------------------------------------
 
-test('giscusMapping: owliki and its former name termx thread by the same page code', () => {
-  const owliki = giscusMapping('owliki', 'p-42')
-  assert.deepEqual(owliki, { mapping: 'specific', term: 'p-42' })
-  assert.deepEqual(giscusMapping('termx', 'p-42'), owliki, 'the old spelling is not a new thread')
+test('giscusMapping: owliki threads by the stable page code', () => {
+  assert.deepEqual(giscusMapping('owliki', 'p-42'), { mapping: 'specific', term: 'p-42' })
+})
+
+test('giscusMapping: the retired name is no longer special-cased', () => {
+  // It passes through as an ordinary giscus mapping rather than threading by
+  // page code — which is what makes updating the config word the migration.
+  assert.deepEqual(giscusMapping('termx', 'p-42'), { mapping: 'termx' })
 })
 
 test('giscusMapping: no page code falls back to pathname, never an empty term', () => {
   // `specific` with an empty term is a discussion nobody can find again.
-  for (const m of ['owliki', 'termx']) {
-    assert.deepEqual(giscusMapping(m, undefined), { mapping: 'pathname' })
-  }
+  assert.deepEqual(giscusMapping('owliki', undefined), { mapping: 'pathname' })
 })
 
 test('giscusMapping: a real giscus mapping passes through untouched', () => {

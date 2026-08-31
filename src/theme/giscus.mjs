@@ -10,8 +10,12 @@
  *
  * `owliki` is not a giscus mapping — it means "thread by the wiki's stable page
  * code", which giscus expresses as `specific` plus that code as the term.
- * `termx` is the same instruction under its former name and resolves to the SAME
- * term, so a site that updates its config keeps every discussion it already has.
+ *
+ * The former name is no longer accepted. It resolved to the same term, so a site
+ * still using it threads identically today and stops threading by page code the
+ * moment it builds against this — its `mapping` falls through to giscus as an
+ * unknown value. Changing that one word in `comments.mapping` is the migration,
+ * and it keeps every existing discussion, because the TERM is unchanged.
  *
  * A page with no code (a generated home, a gitbook source) falls back to
  * `pathname` rather than to `specific` with an empty term, which giscus would
@@ -19,6 +23,6 @@
  */
 export function giscusMapping(configured, pageCode) {
   const mapping = configured || 'pathname'
-  if (mapping !== 'owliki' && mapping !== 'termx') return { mapping }
+  if (mapping !== 'owliki') return { mapping }
   return pageCode ? { mapping: 'specific', term: pageCode } : { mapping: 'pathname' }
 }

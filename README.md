@@ -710,10 +710,9 @@ mdbook can render a [Giscus](https://giscus.app) comment box after each page, ba
                          #   or use pathname / title / og:title
    ```
 
-   `mapping: termx` is the former name of `owliki` and still works. Both resolve to the
-   **same** discussion term, so switching a published site's config from one to the other
-   keeps every existing thread. The page code is also published as
-   `<meta name="owliki:page">` (and, for older readers, `<meta name="termx:page">`).
+   `mapping: termx` was the former name and is **no longer accepted** — change that one
+   word and every existing thread is kept, because the discussion term is the page code
+   either way. The page code is also published as `<meta name="owliki:page">`.
 
 Readers post with a one-time **“Sign in with GitHub”**; comments are stored as Discussions in the
 repo (moderate/reply there or inline), and the widget follows the site's light/dark theme. Omit the

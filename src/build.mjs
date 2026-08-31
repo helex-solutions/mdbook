@@ -258,9 +258,9 @@ export function stageContent(cfg, model, openapiSpecs = {}) {
       text = transformFileEmbeds(text, cfg.site.base) // {% file %} -> PDF/download card
       // Per-page <title>/<meta description>/<meta keywords>: authored description
       // (else a first-paragraph summary), and page tags exported as keywords.
-      // `termxPage` carries the stable wiki page code (for comment threading etc.).
+      // `owlikiPage` carries the stable wiki page code (for comment threading etc.).
       const extra = {}
-      if (f.code) extra.termxPage = f.code
+      if (f.code) extra.owlikiPage = f.code
       if (f.tags?.length) extra.keywords = f.tags
       // Keep hand-picked pages out of the search index (they stay published).
       if (isSearchExcluded(f.dest)) extra.search = false

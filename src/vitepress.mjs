@@ -135,19 +135,16 @@ function seoHead(bundle) {
       tags.push(['meta', { property: 'og:url', content: url }])
       tags.push(['link', { rel: 'canonical', href: url }])
     }
-    // Stable wiki identifiers (space + page code) for downstream tooling, under
-    // BOTH names. `owliki:*` is the name to read; `termx:*` is what the same two
-    // identifiers were called before the rename and is still emitted, because a
-    // published meta tag is consumed by things this repo cannot see — and the
-    // one consumer it can see, Giscus threading, keys existing discussions off
-    // it. Additive costs two tags; dropping the old name orphans threads.
+    // Stable wiki identifiers (space + page code) for downstream tooling. The
+    // former `termx:*` spelling is no longer emitted: anything outside this repo
+    // reading it stops finding it, which is the point of retiring a name rather
+    // than carrying it. Giscus threading is unaffected — it reads the frontmatter
+    // code, not the tag, and the discussion TERM is the code either way.
     if (bundle.spaceCode) {
       tags.push(['meta', { name: 'owliki:space', content: bundle.spaceCode }])
-      tags.push(['meta', { name: 'termx:space', content: bundle.spaceCode }])
     }
-    if (pd.frontmatter?.termxPage) {
-      tags.push(['meta', { name: 'owliki:page', content: pd.frontmatter.termxPage }])
-      tags.push(['meta', { name: 'termx:page', content: pd.frontmatter.termxPage }])
+    if (pd.frontmatter?.owlikiPage) {
+      tags.push(['meta', { name: 'owliki:page', content: pd.frontmatter.owlikiPage }])
     }
     // JSON-LD structured data (WebSite on the home page, TechArticle elsewhere).
     const lang = pd.frontmatter?.lang || defaultLang || 'en'
