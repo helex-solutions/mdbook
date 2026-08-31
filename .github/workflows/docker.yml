@@ -19,12 +19,12 @@ on:
         type: boolean
         default: true
       platforms:
-        description: 'Target platforms — arm64 is emulated, so it roughly doubles the build'
+        description: 'Target platforms — arm64 is emulated, so dropping it roughly halves the build'
         type: choice
         options:
-          - linux/amd64
           - linux/amd64,linux/arm64
-        default: linux/amd64
+          - linux/amd64
+        default: linux/amd64,linux/arm64
 
 jobs:
   image:
