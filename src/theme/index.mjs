@@ -16,16 +16,6 @@ import { renderMermaid } from './mermaid.mjs'
 import './styles/base.css'
 import './styles/smart-text.css'
 
-// Register the vendored StructureDefinition viewer web component
-// (<tx-sd-view>) once, on the client.
-async function registerSdViewer() {
-  if (typeof window === 'undefined') return
-  if (window.customElements?.get('tx-sd-view')) return
-  if (!document.querySelector('tx-sd-view')) return
-  const { initializeWebComponent } = await import('../../vendor/structure-definition-viewer/index.js')
-  if (!window.customElements.get('tx-sd-view')) initializeWebComponent('tx-sd-view')
-}
-
 // Mark the .links-list row whose link points at the current page as current.
 function markCurrentLink() {
   if (typeof document === 'undefined') return
@@ -69,7 +59,6 @@ export default {
     }
     const run = () => {
       renderMermaid()
-      registerSdViewer()
       markCurrentLink()
     }
     onMounted(() => {

@@ -15,7 +15,6 @@ import { transformGitbookCards } from './ingest/cards.mjs'
 import { transformFileEmbeds } from './ingest/file-embed.mjs'
 import { applySeoFrontmatter, deriveDescription } from './ingest/seo.mjs'
 import { auditLinks } from './ingest/links.mjs'
-import { expandStructureDefinitions } from './ingest/structure-definition.mjs'
 import { expandDiagrams, readAttachmentIndex } from './ingest/drawio.mjs'
 import { expandConceptMatrices } from './ingest/concept-matrix.mjs'
 import { loadOpenapiSpecs, authFromSchemes } from './ingest/openapi.mjs'
@@ -198,10 +197,6 @@ export function stageContent(cfg, model, openapiSpecs = {}) {
     attachmentSources.map((a) => [a.mount ?? null, readAttachmentIndex(a.srcDir)])
   )
   const diagramWarnings = []
-  const sdDirs = model.resourceDirs || [
-    path.join(cfg.projectRoot, cfg.source.meta || '__source', 'resources', 'structure-definition'),
-    path.join(cfg.projectRoot, 'input', 'resources', 'structure-definition')
-  ]
   for (const f of model.contentFiles) {
     const dest = path.join(staging, f.dest)
     fs.mkdirSync(path.dirname(dest), { recursive: true })
@@ -235,7 +230,6 @@ export function stageContent(cfg, model, openapiSpecs = {}) {
       }
       if (isOwliki) {
         text = sanitizeOwlikiMarkdown(text)
-        text = expandStructureDefinitions(text, sdDirs) // {{def:…}} -> <tx-sd-view>
         // {{drawio:name}} -> the newest version of that diagram, as an ordinary
         // `files/<folder>/…` embed the attachment pipeline resolves like any other.
         text = expandDiagrams(text, {

@@ -20,13 +20,11 @@ const HTML_TAGS = new Set(
   ).split(' ')
 )
 
-// Custom elements mdbook itself emits while staging — the vendored
-// StructureDefinition viewer that `{{def:…}}` expands to. They are not HTML
-// element names, so without this the hardening pass below escapes the markup the
-// expansion just wrote and the macro renders as literal `&lt;tx-sd-view …`
-// instead of the element tree. `createMdbookConfig` declares the same names to
-// Vue's compiler (`isCustomElement`); this is that list, so the two cannot drift.
-export const MDBOOK_ELEMENTS = new Set(['tx-sd-view'])
+// Custom elements mdbook emits while staging. Empty: nothing does any more, and
+// the pair that used to — the hardening exemption here and the `isCustomElement`
+// declaration in `createMdbookConfig` — has to stay a pair, because a tag
+// exempted from one and not the other renders as escaped literal markup.
+export const MDBOOK_ELEMENTS = new Set()
 
 // Split markdown into code / non-code regions and run `fn` over the prose only,
 // leaving fenced blocks and inline code verbatim (their `<…>` and `{{…}}` are

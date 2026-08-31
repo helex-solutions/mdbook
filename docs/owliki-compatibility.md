@@ -1,9 +1,9 @@
 # Owliki → mdbook: differences reference
 
 Reference for publishing **Owliki** wiki content as a static site with **mdbook**. It
-covers the reference wiki Owliki succeeds too (the `markdown-it` renderer in
-`@termx-health/markdown-parser`), because both write the same dialect — that
-is the point of it. Use it when planning a wiki-to-site migration.
+covers the reference wiki Owliki succeeds too — a `markdown-it` renderer like this one —
+because both write the same dialect, which is the point of it. Use it when planning a
+wiki-to-site migration.
 
 mdbook is built on **VitePress**, which uses the same `markdown-it` engine as the wiki,
 so most syntax is reproduced natively. Where they differ it's almost always because a
@@ -49,7 +49,7 @@ Legend: ✅ full parity · 🟡 works with a caveat · 🔴 not supported static
 | PlantUML | ` ```plantuml ` | ✅ | Encoded (`plantuml-encoder`) to the server set in `diagrams.plantumlServer`; `@startuml`/`@enduml` added when the source has no `@start` marker. **No default** — with none configured the fence renders as a code block and nothing is fetched |
 | GitBook card tables | `<table data-view="cards">` | ✅ | Converted to a card grid (also cover-image and linked-title variants) — for GitBook-sourced spaces |
 | Card grid with buttons | list + `{.card-grid}` | ✅ | Markdown-authored card grid: per-item image (cover), heading (title), text (description) and `{.button}` links (rendered as `a.mdbook-card-btn`; `.secondary` = outlined). `{.card-grid .cards-row}` for a horizontal layout. See `src/markdown/card-grid.mjs` |
-| Include: StructureDefinition | `{{def:code; type=diff\|snap\|hybrid}}` | ✅ | The full element tree — cardinality, flags, types, bindings, diff/hybrid/snapshot — rendered by the vendored `@termx-health/structure-definition-viewer` from the exported `<meta>/resources/structure-definition/<code>.json`. Falls back to an include card when that file is absent, which is what an Owliki-published repo currently gets: see §2.2 |
+| Include: StructureDefinition | `{{def:code; type=diff\|snap\|hybrid}}` | 🟡 | An include card naming the definition. The element tree needs a viewer mdbook can no longer ship: see §2.2 |
 | Include: CodeSystem concepts | `{{csc:code\|ver; properties=…; langs=…; limit=…}}` | ✅ | Fetched at build time from the FHIR server: `GET {tx-server}/CodeSystem/{code}` → inline `concept[]`. Card fallback if `tx-server` is unset or the fetch fails |
 | Include: ValueSet concepts | `{{vsc:code\|ver; …}}` | ✅ | Fetched at build time: `GET {tx-server}/ValueSet/{code}/$expand?includeDesignations=true` → `expansion.contains[]`. Same fallback |
 
@@ -88,22 +88,31 @@ page, so a guess would show another page's picture, silently.
 > of the exception. Until it does, a published page whose only attachment is a
 > default-named diagram cannot be resolved.
 
-### 2.2 `{{def:}}` on an Owliki-published repo
+### 2.2 `{{def:}}` renders an include card, not an element tree
 
-The static half is real and complete: given the StructureDefinition JSON, the
-vendored viewer draws the same element tree the wiki's `FhirStructureDefinitionViewer`
-draws. It reads that JSON from `<source.meta>/resources/structure-definition/<code>.json`,
-which is what a `wiki-ssg` export writes.
+`{{def:code}}` renders a card naming the definition. It used to expand to a
+`<tx-sd-view>` web component that drew the full element tree — cardinality, flags, types,
+bindings — from a StructureDefinition JSON in the export. That viewer came from the
+superseded vendor's package family, vendored into this repository to avoid a registry
+login; the dependency is no longer permitted, and vendoring a copy does not change what
+the dependency is. The generator now ships no viewer at all.
 
-`WikiMdbookDataHandler` does not write it — it publishes `space.json`, `pages.json`,
-`pages/` and `attachments/` only — so on an Owliki-published repo a `{{def:}}` macro
-degrades to the include card. There is nothing the generator can do about that: a
-static site has no API to call, and the resource has to be *in* the repository.
+The Helex FHIR package is not a substitute as it stands. `@helex-solutions/fhir` exports
+a **React** component with `antd` among its peers and publishes to GitHub Packages — so
+adopting it would mount a React runtime into every page of a static site and reintroduce
+the CI-auth problem vendoring was done to avoid. mdbook is Vue, and a docs generator
+should not carry two frameworks to draw one table.
 
-> **Publisher follow-up.** The handler should emit
-> `resources/structure-definition/<code>.json` for every definition its pages cite,
-> from the same compiled resource `GET /structure-definitions/{id}/fhir` returns.
-> The generator already reads exactly that path; no change is needed here.
+> **What would restore the tree.** A web-component build of the Helex viewer — the same
+> shape as the one removed: a custom element taking the resource as an attribute, with no
+> framework of its own. The build-time half is a small module again at that point: read the
+> JSON beside the export, emit the element, and add its tag to `MDBOOK_ELEMENTS` (which is
+> also declared to Vue as a custom element — the two must move together, or the markup
+> renders as escaped text).
+>
+> A second thing is missing either way: `WikiMdbookDataHandler` publishes no
+> `resources/structure-definition/<code>.json`, so an Owliki repo has no resource for a
+> viewer to draw even once one exists.
 
 ## 3. Editor-only features (not applicable to a static site)
 
@@ -122,7 +131,7 @@ which is stricter. mdbook normalizes content at build time so these never break:
 |---|---|---|
 | `{{ … }}` treated as Vue interpolation | `{{def/csc/vsc:…}}` and any `{{…}}` | rendered `v-pre` (inline code / expanded), so Vue leaves them alone |
 | "Element is missing end tag" | Wiki.js unclosed `<span>` autolink-breakers (`Draw.<span>io`) | stripped during staging |
-| Custom elements | `<tx-sd-view>` (SD viewer) | declared to Vue via `isCustomElement` |
+| Custom elements | none are emitted today | the `MDBOOK_ELEMENTS` / `isCustomElement` pair is kept as one seam, since exempting a tag from only one half renders it as escaped literal markup |
 | Unknown fence language hard-fails the build | e.g. a stray ` ```s ` | normalized to a real language (`s → sh`); extend the alias map for others |
 | markdown-it-attrs crash on multimd tables | attrs reads `token.meta.colsnum`, which is `null` on multimd tokens | block tokens get a non-null `meta` before attrs runs |
 
@@ -221,6 +230,5 @@ and which are handled here) is specified in the wiki repo's `docs/wiki-mdbook-sy
   `space.json` `ssg` block (theme/footer/tx-server/search/logo) as config defaults, with a
   repo's `.mdbook/config.yml` still winning
 - **Ingestion adapters:** `src/ingest/` — `owliki.mjs`, `gitbook.mjs`
-- **Client runtime + styles:** `src/theme/` — mermaid + `<tx-sd-view>` registration +
+- **Client runtime + styles:** `src/theme/` — mermaid rendering +
   current-link marking, `styles/smart-text.css`, `skins/`
-- **Vendored viewer:** `vendor/structure-definition-viewer/`

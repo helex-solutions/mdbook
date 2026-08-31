@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { hardenMarkdown } from '../src/ingest/sanitize.mjs'
+import { hardenMarkdown, MDBOOK_ELEMENTS } from '../src/ingest/sanitize.mjs'
 
 test('hardenMarkdown: escapes non-HTML tags used as prose placeholders', () => {
   const out = hardenMarkdown('Return a `<Patient>` — actually <Patient> and <Registry name>.')
@@ -44,10 +44,16 @@ test('hardenMarkdown: does not touch frontmatter', () => {
   assert.match(out, /&lt;Thing> and &#123;&#123;x&#125;&#125;/, 'body is still hardened')
 })
 
-test('hardenMarkdown: keeps the custom elements mdbook itself expands macros into', () => {
-  // `{{def:…}}` expands to <tx-sd-view> BEFORE hardening runs; escaping it here
-  // would leave the macro rendering as literal markup instead of an element tree.
-  const out = hardenMarkdown('<div class="mdbook-sd"><tx-sd-view data="%7B%7D" mode="diff"></tx-sd-view></div>')
-  assert.match(out, /<tx-sd-view data="%7B%7D" mode="diff">/, 'the opening tag survives')
-  assert.match(out, /<\/tx-sd-view>/, 'and so does the closing tag')
+test('hardenMarkdown: a declared custom element survives, an undeclared one does not', () => {
+  // The exemption list is empty, and the pair it belongs to is what matters: a tag
+  // exempted here but not declared to Vue (or the reverse) renders as escaped
+  // literal markup. This pins the mechanism so the next element that needs it
+  // cannot be added to only one half.
+  assert.match(hardenMarkdown('<my-widget a="1"></my-widget>'), /&lt;my-widget/, 'undeclared is escaped')
+  MDBOOK_ELEMENTS.add('my-widget')
+  try {
+    assert.match(hardenMarkdown('<my-widget a="1"></my-widget>'), /<my-widget a="1">/, 'declared survives')
+  } finally {
+    MDBOOK_ELEMENTS.delete('my-widget')
+  }
 })

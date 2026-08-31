@@ -211,7 +211,6 @@ export function createMdbookConfig(bundle) {
       : {}),
     transformHead: seoHead(bundle),
     markdown,
-    // <tx-sd-view> is the vendored StructureDefinition viewer web component.
     vue: { template: { compilerOptions: { isCustomElement: (tag) => MDBOOK_ELEMENTS.has(tag) } } },
     // Don't watch mdbook's own source as config deps — editing the tool while a
     // project dev server runs would otherwise restart it (Shiki-dispose race).
