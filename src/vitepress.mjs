@@ -136,10 +136,11 @@ function seoHead(bundle) {
       tags.push(['link', { rel: 'canonical', href: url }])
     }
     // Stable wiki identifiers (space + page code) for downstream tooling. The
-    // former `termx:*` spelling is no longer emitted: anything outside this repo
-    // reading it stops finding it, which is the point of retiring a name rather
-    // than carrying it. Giscus threading is unaffected — it reads the frontmatter
-    // code, not the tag, and the discussion TERM is the code either way.
+    // earlier spelling of these two tags is no longer emitted: anything outside
+    // this repo reading it stops finding it, which is the point of retiring a
+    // name rather than carrying it. Giscus threading is unaffected — it reads
+    // the frontmatter code, not the tag, and the discussion TERM is the code
+    // either way.
     if (bundle.spaceCode) {
       tags.push(['meta', { name: 'owliki:space', content: bundle.spaceCode }])
     }
