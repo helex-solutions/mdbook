@@ -766,8 +766,8 @@ Each config option, and a project that uses it:
 | `source.format: gitbook` (`SUMMARY.md` + `README.md` + `.gitbook/assets`) | portfolio |
 | `source.format: owliki` + `meta` / `pages` (under `source/`) | hl7lt-website |
 | `site.url` (sitemap, canonical, Open Graph) | hl7lt-website |
-| `theme.skin` | hl7lt-website (`hl7lt`), portfolio (`default`) |
-| `search` | all three |
+| `theme.skin` | hl7lt-website (`hl7lt`), portfolio (`helex`) |
+| `search` | both |
 | `footer` (`message` + `copyright`) | hl7lt-website |
 | `nav` | hl7lt-website |
 | `locales` (per-locale menu labels/links) | hl7lt-website |
