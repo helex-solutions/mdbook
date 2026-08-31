@@ -91,12 +91,35 @@ location /mdbook/ {
     proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header X-Forwarded-Host  $http_host;
+
+    # Compression. `serve` sends every file uncompressed, so whatever the proxy
+    # does is what readers get — and nginx's defaults do nothing here twice over:
+    # `gzip_proxied` is `off`, so no proxied response is compressed at all, and
+    # the default `gzip_types` is `text/html` alone, so JavaScript is skipped even
+    # once it is on. Both lines are needed, and belong in this location rather
+    # than the `http` block, where they would change every other vhost too.
+    gzip_proxied any;
+    gzip_types application/javascript text/javascript application/json text/css image/svg+xml;
+    gzip_comp_level 6;
+    gzip_vary on;
+    gzip_min_length 1024;
 }
 ```
 
 `serve` derives its own public origin from `X-Forwarded-Proto`/`X-Forwarded-Host`
 (used for OIDC redirect URIs), so pass both; `auth.publicUrl` overrides them when a
 proxy cannot send them.
+
+**Compression is not optional on a large site.** The local search index ships as a
+single JavaScript chunk, and every reader downloads all of it the first time they
+open search. On a 2 200-page site that chunk is ~29 MB, which gzip takes to
+~7 MB — measured, on `docs.helex.org/emr`: 30,007,923 bytes transferred before,
+7,508,680 after, and first-search load time from 3.4 s to 1.6 s. The chunk is
+served from `/assets/` with `Cache-Control: immutable`, so it is one download per
+reader per build, but that is still the download that decides whether search feels
+usable. A gated site makes this bite harder than a public one: until v1.6.0 a
+wholly gated site indexed nothing, so the chunk was a couple of hundred bytes and
+compression never mattered.
 
 ## Publishing the image
 
