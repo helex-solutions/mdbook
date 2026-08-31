@@ -9,6 +9,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { walkMarkdown, makeExcluder } from './util.mjs'
+import { collectPdfs, prettifyPdfName } from './pdf.mjs'
 import { iconMarkup } from '../icons.mjs'
 
 const ITEM_RE = /^(\s*)[*-]\s+\[([^\]]*)\]\(([^)]+)\)/
@@ -55,6 +56,12 @@ export function ingestGitbook(cfg) {
   // both the published pages and the generated menu.
   const isExcluded = makeExcluder(cfg.source.exclude || [])
 
+  // PDFs stored in the repo are published as pages (`source.pdf: false` to keep
+  // them out of the site entirely). The assets dir is skipped either way — it is
+  // copied wholesale, and its files are referenced by the pages that embed them.
+  const withPdf = cfg.source.pdf !== false
+  const assetsDir = cfg.source.assets || '.gitbook/assets'
+
   const sidebars = {}
   const navs = {}
   const spaceNames = {}
@@ -72,6 +79,8 @@ export function ingestGitbook(cfg) {
     homeRel: cfg.source.home || 'README.md',
     excludeDirs: localeDirs,
     isExcluded,
+    withPdf,
+    assetsDir,
     sidebars,
     navs,
     contentFiles,
@@ -91,6 +100,8 @@ export function ingestGitbook(cfg) {
       homeRel: 'README.md',
       excludeDirs: [],
       isExcluded,
+      withPdf,
+      assetsDir,
       sidebars,
       navs,
       contentFiles,
@@ -128,7 +139,7 @@ export function ingestGitbook(cfg) {
 // Populates sidebars/navs/contentFiles for `lang`; returns the discovered title.
 function ingestOne({
   root, dir, lang, prefix, destPrefix, summaryName, homeRel, excludeDirs, isExcluded,
-  sidebars, navs, contentFiles, folderLabels
+  withPdf = true, assetsDir = null, sidebars, navs, contentFiles, folderLabels
 }) {
   const summaryPath = path.join(dir, summaryName)
   const hasSummary = fs.existsSync(summaryPath)
@@ -139,7 +150,7 @@ function ingestOne({
   const labels = {}
   const sidebar = hasSummary
     ? parseSummary(fs.readFileSync(summaryPath, 'utf8'), prefix)
-    : buildAutoSidebar(dir, prefix, excludeDirs, isExcluded, labels)
+    : buildAutoSidebar(dir, prefix, excludeDirs, isExcluded, labels, withPdf)
   if (hasSummary) decorateIcons(sidebar, root) // links carry the locale prefix; resolved against root
   if (folderLabels) for (const [rel, label] of Object.entries(labels)) folderLabels[destPrefix + rel] = label
 
@@ -156,13 +167,24 @@ function ingestOne({
     exclude: [summaryName, '.mdbook', 'node_modules', ...excludeDirs],
     isExcluded
   })
+  const taken = new Set()
   for (const abs of files) {
     const rel = path.relative(dir, abs)
     // A README is a folder's index at ANY depth (root README -> index.md,
     // docs/README.md -> docs/index.md), so `/docs/` resolves to a real page —
     // this is what toLink() and the link rewriter already assume.
     const dest = rel.replace(/(^|[\\/])README\.md$/i, (m, sep) => `${sep}index.md`)
+    taken.add(destPrefix + dest.split(path.sep).join('/'))
     contentFiles.push({ src: abs, dest: destPrefix + dest, lang })
+  }
+
+  // PDFs: the file (staged under public/) plus a generated page previewing it.
+  // Passing `taken` keeps a markdown page that already owns the URL — a
+  // `spec.md` next to its exported `spec.pdf` — as the page for it.
+  if (withPdf) {
+    contentFiles.push(
+      ...collectPdfs({ dir, destPrefix, lang, excludeDirs, isExcluded, assetsDir, taken })
+    )
   }
 
   sidebars[lang] = sidebar
@@ -215,11 +237,15 @@ const AUTO_SIDEBAR_SKIP = new Set(['node_modules', 'public', '.mdbook', '.gitboo
 
 // Prefix for the "back to the top-level menu" entry at the top of each section.
 const BACK_ICON = iconMarkup('arrow-left')
+// PDF pages are generated, so they carry no frontmatter to take an icon from.
+const PDF_ICON = iconMarkup('file-pdf')
 
-// Split a directory into its markdown files (as sidebar links labeled by H1,
-// carrying any `icon:` frontmatter) and its subdirectory names. READMEs are the
-// folder's index, so they are never listed as their own entry.
-function scanDir(d, base, skip, isExcluded, relDir) {
+// Split a directory into its pages (as sidebar links) and its subdirectory
+// names. Markdown files are labeled by their H1 and carry any `icon:`
+// frontmatter; PDFs are listed alongside them, labeled by file name and marked
+// with a PDF icon, since each one is published as a page that previews it.
+// READMEs are the folder's index, so they are never listed as their own entry.
+function scanDir(d, base, skip, isExcluded, relDir, withPdf = true) {
   let entries
   try {
     entries = fs.readdirSync(d, { withFileTypes: true })
@@ -228,12 +254,20 @@ function scanDir(d, base, skip, isExcluded, relDir) {
   }
   const files = []
   const dirs = []
+  const pdfs = []
+  const mdStems = new Set()
   for (const e of entries) {
     if (e.name.startsWith('.') || skip.has(e.name)) continue
     const rel = relDir ? `${relDir}/${e.name}` : e.name
     if (isExcluded?.(rel, e.name, e.isDirectory())) continue
-    if (e.isDirectory()) dirs.push(e.name)
-    else if (e.isFile() && e.name.toLowerCase().endsWith('.md') && !/^readme\.md$/i.test(e.name)) {
+    if (e.isDirectory()) {
+      dirs.push(e.name)
+      continue
+    }
+    if (!e.isFile()) continue
+    if (e.name.toLowerCase().endsWith('.md')) {
+      mdStems.add(e.name.replace(/\.md$/i, '').toLowerCase())
+      if (/^readme\.md$/i.test(e.name)) continue
       const abs = path.join(d, e.name)
       const meta = readMeta(abs)
       files.push({
@@ -241,13 +275,26 @@ function scanDir(d, base, skip, isExcluded, relDir) {
         link: `${base}/${e.name.replace(/\.md$/i, '')}`,
         icon: meta.icon
       })
+    } else if (withPdf && /\.pdf$/i.test(e.name) && !/^readme\.pdf$/i.test(e.name)) {
+      pdfs.push(e.name)
     }
+  }
+  // A PDF whose page was claimed by a same-named markdown file (`spec.md` next
+  // to its exported `spec.pdf`) is already in the menu as that page.
+  for (const name of pdfs) {
+    const stem = name.replace(/\.pdf$/i, '')
+    if (mdStems.has(stem.toLowerCase())) continue
+    files.push({ text: prettifyPdfName(name), link: `${base}/${stem}`, icon: PDF_ICON })
   }
   return { files, dirs }
 }
 
-const readmeIn = (d) =>
-  ['README.md', 'readme.md'].map((r) => path.join(d, r)).find((p) => fs.existsSync(p))
+// A folder's index page: its README, in markdown or — since a PDF is published
+// as a page too — as a PDF.
+const readmeIn = (d, withPdf = true) =>
+  ['README.md', 'readme.md', ...(withPdf ? ['README.pdf', 'readme.pdf'] : [])]
+    .map((r) => path.join(d, r))
+    .find((p) => fs.existsSync(p))
 
 // Folders sort before files, each alphabetically (natural order) by their visible
 // label. Icons are applied only after sorting so the markup can't affect order.
@@ -263,21 +310,22 @@ function orderAndIcon(folders, files) {
 // A folder's label and icon come from its README (`sidebarTitle` > H1, and its
 // own `icon:` if set); otherwise the folder name and a generic folder icon.
 function folderMeta(readme, name) {
-  const meta = readme ? readMeta(readme) : { label: null, icon: '' }
+  // A PDF README carries no frontmatter or H1 to read a label from.
+  const meta = readme && !/\.pdf$/i.test(readme) ? readMeta(readme) : { label: null, icon: '' }
   return { label: meta.label || prettify(name), icon: meta.icon || iconMarkup('folder') }
 }
 
 // Recursively build a nested item list for a directory: subfolders (collapsed
 // groups, their README as the group's link) first, then the folder's own pages.
-function subtree(d, base, skip, isExcluded, relDir, labels) {
-  const { files, dirs } = scanDir(d, base, skip, isExcluded, relDir)
+function subtree(d, base, skip, isExcluded, relDir, labels, withPdf) {
+  const { files, dirs } = scanDir(d, base, skip, isExcluded, relDir, withPdf)
   const folders = []
   for (const name of dirs) {
     const childDir = path.join(d, name)
     const childBase = `${base}/${name}`
     const childRel = relDir ? `${relDir}/${name}` : name
-    const childItems = subtree(childDir, childBase, skip, isExcluded, childRel, labels)
-    const readme = readmeIn(childDir)
+    const childItems = subtree(childDir, childBase, skip, isExcluded, childRel, labels, withPdf)
+    const readme = readmeIn(childDir, withPdf)
     if (!childItems.length && !readme) continue
     const fm = folderMeta(readme, name)
     if (labels) labels[childRel] = fm.label
@@ -295,16 +343,16 @@ function subtree(d, base, skip, isExcluded, relDir, labels) {
 // link into each section. Folder labels come from a README H1 (else the folder
 // name); files from their own H1. `prefix` is '' for the default locale, '/<lang>'
 // otherwise.
-function buildAutoSidebar(dir, prefix, excludeDirs = [], isExcluded, labels) {
+function buildAutoSidebar(dir, prefix, excludeDirs = [], isExcluded, labels, withPdf = true) {
   const skip = new Set([...excludeDirs, ...AUTO_SIDEBAR_SKIP])
-  const { files: rootFiles, dirs: rootDirs } = scanDir(dir, prefix, skip, isExcluded, '')
+  const { files: rootFiles, dirs: rootDirs } = scanDir(dir, prefix, skip, isExcluded, '', withPdf)
   const sidebars = {}
   const sectionLinks = []
   for (const name of rootDirs) {
     const childDir = path.join(dir, name)
     const childBase = `${prefix}/${name}`
-    const items = subtree(childDir, childBase, skip, isExcluded, name, labels)
-    const readme = readmeIn(childDir)
+    const items = subtree(childDir, childBase, skip, isExcluded, name, labels, withPdf)
+    const readme = readmeIn(childDir, withPdf)
     if (!items.length && !readme) continue
     const { label, icon } = folderMeta(readme, name)
     if (labels) labels[name] = label

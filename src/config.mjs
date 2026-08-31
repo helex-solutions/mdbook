@@ -20,7 +20,7 @@ function readConfigFile(mdbookDir) {
 
 // Defaults per source format. GitBook and Owliki exports have different layouts.
 const SOURCE_DEFAULTS = {
-  gitbook: { root: '.', summary: 'SUMMARY.md', home: 'README.md', assets: '.gitbook/assets' },
+  gitbook: { root: '.', summary: 'SUMMARY.md', home: 'README.md', assets: '.gitbook/assets', pdf: true },
   owliki: { meta: '__source', pages: 'input', assets: 'files' }
 }
 
