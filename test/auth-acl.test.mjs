@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  ruleRegex,
   resolveAccess,
   routeForDest,
   buildAclManifest,
@@ -139,4 +140,35 @@ test('the search index chunk is pinned at the site default', () => {
   })
   assert.deepEqual(requirementFor(m, '/assets/chunks/@localSearchIndexroot.abc123.js'), ['viewer'])
   assert.equal(isAllowed(requirementFor(m, SEARCH_INDEX_PREFIX + 'root.js'), null), false)
+})
+
+test('ruleRegex: a rule path containing a space gates exactly what it names', () => {
+  // The glob expansion used to park `**` behind a space, then turn every space
+  // into `.*` — so this pattern became `my.*docs/.*` and gated unrelated
+  // sections whose names merely started and ended the same way.
+  const re = ruleRegex('my docs/**')
+  assert.equal(re.test('my docs/internal.md'), true)
+  assert.equal(re.test('my docs/deep/internal.md'), true)
+  assert.equal(re.test('mydocs/internal.md'), false)
+  assert.equal(re.test('my other docs/internal.md'), false)
+})
+
+test('ruleRegex: the glob convention itself is unchanged', () => {
+  assert.equal(ruleRegex('internal/**').test('internal/a/b.md'), true)
+  assert.equal(ruleRegex('internal/**').test('public/a.md'), false)
+  // `*` stays within one segment; `**` crosses them.
+  assert.equal(ruleRegex('specs/*.md').test('specs/a.md'), true)
+  assert.equal(ruleRegex('specs/*.md').test('specs/deep/a.md'), false)
+  assert.equal(ruleRegex('specs/**/x.md').test('specs/deep/x.md'), true)
+  // A leading locale segment is transparent, so one rule covers translations.
+  assert.equal(ruleRegex('internal/**').test('de/internal/a.md'), true)
+})
+
+test('a rule path with a space resolves and enforces on the real path only', () => {
+  const rules = [{ path: 'my docs/**', access: ['editor'] }]
+  assert.deepEqual(resolveAccess('my docs/plan.md', { rules }), ['editor'])
+  assert.equal(resolveAccess('mydocs/plan.md', { rules }), 'public')
+  const m = buildAclManifest({ entries: [], rules, siteDefault: 'public' })
+  assert.deepEqual(requirementFor(m, '/my docs/plan'), ['editor'])
+  assert.equal(requirementFor(m, '/mydocs/plan'), 'public')
 })

@@ -14,9 +14,11 @@ export function ruleRegex(pattern) {
   const norm = String(pattern).replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\/+/, '').replace(/\/+$/, '')
   const esc = norm
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*\*/g, ' ')
-    .replace(/\*/g, '[^/]*')
-    .replace(/ /g, '.*')
+    // One pass, `**` first. Expanding `*` first and parking `**` behind a
+    // placeholder needs a character no path can contain — a space was used, so
+    // a rule on a path that has one (`my docs/**`) had that space rewritten to
+    // `.*` and silently gated more than it named.
+    .replace(/\*\*|\*/g, (m) => (m === '**' ? '.*' : '[^/]*'))
   // Optional single leading locale segment (e.g. `de/`), then the pattern; a
   // directory pattern also matches everything beneath it.
   return new RegExp(`^(?:[a-z]{2}(?:-[A-Za-z0-9]+)?/)?${esc}(?:/.*)?$`)
