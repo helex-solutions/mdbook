@@ -153,8 +153,8 @@ exact version, so `@v1` resolves to nothing — upgrade by changing the pin.
 `comments.mapping` must read `owliki` if it carried the retired name. Both spellings resolved to
 the same discussion term — the page code — so changing the word keeps every existing thread; a
 config left alone stops threading by page code instead of silently threading by something else.
-The page code is published as `<meta name="owliki:page">`, and the earlier `termx:*` tags are no
-longer emitted.
+The page code is published as `<meta name="owliki:page">`, and the earlier tags under the former
+name are no longer emitted.
 
 `{{def:}}` renders an include card naming the definition rather than a StructureDefinition element
 tree. The viewer that drew the tree came from a package this project no longer depends on, and the
@@ -721,9 +721,9 @@ mdbook can render a [Giscus](https://giscus.app) comment box after each page, ba
                          #   or use pathname / title / og:title
    ```
 
-   `mapping: termx` was the former name and is **no longer accepted** — change that one
-   word and every existing thread is kept, because the discussion term is the page code
-   either way. The page code is also published as `<meta name="owliki:page">`.
+   The mapping's former name is **no longer accepted** — set it to `owliki` and every
+   existing thread is kept, because the discussion term is the page code either way. The
+   page code is also published as `<meta name="owliki:page">`.
 
 Readers post with a one-time **“Sign in with GitHub”**; comments are stored as Discussions in the
 repo (moderate/reply there or inline), and the widget follows the site's light/dark theme. Omit the
