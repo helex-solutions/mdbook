@@ -16,7 +16,7 @@ import { renderMermaid } from './mermaid.mjs'
 import './styles/base.css'
 import './styles/smart-text.css'
 
-// Register the vendored TermX StructureDefinition viewer web component
+// Register the vendored StructureDefinition viewer web component
 // (<tx-sd-view>) once, on the client.
 async function registerSdViewer() {
   if (typeof window === 'undefined') return

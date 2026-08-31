@@ -20,7 +20,7 @@ const HTML_TAGS = new Set(
   ).split(' ')
 )
 
-// Custom elements mdbook itself emits while staging — the vendored TermX
+// Custom elements mdbook itself emits while staging — the vendored
 // StructureDefinition viewer that `{{def:…}}` expands to. They are not HTML
 // element names, so without this the hardening pass below escapes the markup the
 // expansion just wrote and the macro renders as literal `&lt;tx-sd-view …`

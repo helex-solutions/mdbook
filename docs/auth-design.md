@@ -81,7 +81,7 @@ fully configured from env alone:
 | `session.secret` | `AUTH_SESSION_SECRET` |
 
 (`AUTH_OIDC_*` are the Helex runtime-config names; `OAUTH_*` and `AUTH_ROLE_CLAIMS`/`GUEST_DISABLED`
-are the TermX ones. The `issuers` map mirrors the Helex backend's
+are the legacy ones. The `issuers` map mirrors the Helex backend's
 `…auth.oidc.issuers.<name>.{issuer-uri, jwk-set-uri, audience}` semantics.)
 
 Per-page override, in frontmatter:
@@ -113,7 +113,7 @@ The build stays static-host-compatible; auth adds metadata, it does not change p
    }
    ```
 
-   The `assets` block covers attachments belonging to protected termx pages (attachments are
+   The `assets` block covers attachments belonging to protected wiki pages (attachments are
    keyed by page id), so images embedded in a protected page inherit its ACL.
 2. **Search exclusion** — VitePress emits one local search chunk for the whole site
    (`assets/chunks/@localSearchIndex*.js`), so whoever can fetch that chunk can read the title
@@ -229,8 +229,8 @@ config.
   `mdbook serve`** runs behind nginx. The GitHub Action grows a deploy target for this
   (host/path/key inputs), so a repo goes content-push → built → live on its own server with no
   third-party hosting in the path — explicitly replacing Cloudflare Pages + Access setups.
-- **nginx + serve** — nginx terminates TLS and proxies to `mdbook serve` (same shape as the
-  TermX quick-start nginx configs). The `serve` port must not be reachable directly.
+- **nginx + serve** — nginx terminates TLS and proxies to `mdbook serve` (the shape the suite's own
+  quick-start nginx configs use). The `serve` port must not be reachable directly.
 - **Docker** — one image running `mdbook serve --project /site`; config via env
   (`AUTH_OIDC_AUTHORITY`, `AUTH_OIDC_CLIENT_ID`, `AUTH_SESSION_SECRET`, optionally
   `AUTH_OIDC_CLIENT_SECRET` — see the env table above).
