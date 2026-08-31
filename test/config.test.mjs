@@ -76,7 +76,7 @@ function cfgLike({ raw = {}, theme = {}, footer = null, txServer = null, site = 
   return {
     raw,
     site: { description: '', url: null, logo: null, ...site },
-    theme: { skin: 'default', accent: null, switcher: false, ...theme },
+    theme: { skin: 'default', ...theme },
     footer,
     txServer,
     search: true
@@ -89,7 +89,7 @@ test('applySpaceConfig: space ssg fills config that was not set explicitly', () 
     description: 'From the wiki',
     siteUrl: 'https://tutorial.example.org',
     ssg: {
-      theme: { skin: 'helex', accent: '#0aa', switcher: true },
+      theme: { skin: 'helex' },
       footer: { message: 'Guide', copyright: '(c) 2026' },
       txServer: 'https://tx.example.org/api/fhir',
       search: false,
@@ -97,8 +97,6 @@ test('applySpaceConfig: space ssg fills config that was not set explicitly', () 
     }
   })
   assert.equal(cfg.theme.skin, 'helex')
-  assert.equal(cfg.theme.accent, '#0aa')
-  assert.equal(cfg.theme.switcher, true)
   assert.deepEqual(cfg.footer, { message: 'Guide', copyright: '(c) 2026' })
   assert.equal(cfg.txServer, 'https://tx.example.org/api/fhir')
   assert.equal(cfg.search, false)
@@ -109,21 +107,20 @@ test('applySpaceConfig: space ssg fills config that was not set explicitly', () 
 
 test('applySpaceConfig: an explicit config.yml value wins over the space', () => {
   const cfg = cfgLike({
-    raw: { theme: { skin: 'custom', switcher: false }, search: true, 'tx-server': 'https://cfg/fhir' },
-    theme: { skin: 'custom', switcher: false },
+    raw: { theme: { skin: 'custom' }, search: true, 'tx-server': 'https://cfg/fhir' },
+    theme: { skin: 'custom' },
     footer: { message: 'Config footer' },
     txServer: 'https://cfg/fhir'
   })
   applySpaceConfig(cfg, {
     ssg: {
-      theme: { skin: 'helex', switcher: true },
+      theme: { skin: 'helex' },
       footer: { message: 'Wiki footer' },
       txServer: 'https://wiki/fhir',
       search: false
     }
   })
   assert.equal(cfg.theme.skin, 'custom', 'explicit skin kept')
-  assert.equal(cfg.theme.switcher, false, 'explicit switcher kept')
   assert.equal(cfg.txServer, 'https://cfg/fhir', 'explicit tx-server kept')
   assert.equal(cfg.search, true, 'explicit search kept')
   assert.deepEqual(cfg.footer, { message: 'Config footer' }, 'existing footer kept')

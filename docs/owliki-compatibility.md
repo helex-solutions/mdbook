@@ -174,7 +174,7 @@ The Owliki space carries the generator settings you'd otherwise hand-write in
 
 ```json
 "ssg": {
-  "theme":  { "skin": "helex", "accent": "#2f6feb", "switcher": true },
+  "theme":  { "skin": "helex" },
   "footer": { "message": "…", "copyright": "…" },
   "txServer": "https://your-helextx-host/api/fhir",
   "search": true,
@@ -182,7 +182,7 @@ The Owliki space carries the generator settings you'd otherwise hand-write in
 }
 ```
 
-These become the **base** config (`theme.skin`/`accent`/`switcher`, `footer`, `tx-server`,
+These become the **base** config (`theme.skin`, `footer`, `tx-server`,
 `search`, `site.logo`). A repo's own `.mdbook/config.yml` still wins — it only fills what the
 config didn't set explicitly — so you can configure everything in the wiki and keep `config.yml`
 optional, or override individual fields per repo. Applied by `applySpaceConfig` in `src/config.mjs`.

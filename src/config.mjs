@@ -77,8 +77,6 @@ export function loadConfig(projectRoot, overrides = {}) {
     txServer: (data.txServer || data['tx-server'] || null)?.replace?.(/\/$/, '') || null,
     theme: {
       skin: data.theme?.skin || 'default',
-      accent: data.theme?.accent || null,
-      switcher: data.theme?.switcher ?? false, // show a live skin switcher in the UI
       ...(data.theme || {})
     },
     // Menu customization — merged on top of the auto-generated menu.
@@ -128,7 +126,7 @@ export function loadConfig(projectRoot, overrides = {}) {
 }
 
 // Merge the space.json export metadata into cfg as defaults. A repo's own config.yml always wins:
-// fields with a non-null default (skin/switcher/search) are only taken from the space when the raw
+// fields with a non-null default (skin/search) are only taken from the space when the raw
 // parsed config didn't set them; CI/CNAME URL detection still wins over the space's siteUrl upstream.
 export function applySpaceConfig(cfg, model) {
   if (!cfg.site.description && model.description) cfg.site.description = model.description
@@ -138,8 +136,6 @@ export function applySpaceConfig(cfg, model) {
   const raw = cfg.raw || {}
   const ssg = model.ssg || {}
   if (ssg.theme?.skin && raw.theme?.skin == null) cfg.theme.skin = ssg.theme.skin
-  if (ssg.theme?.accent && raw.theme?.accent == null) cfg.theme.accent = ssg.theme.accent
-  if (ssg.theme?.switcher != null && raw.theme?.switcher == null) cfg.theme.switcher = ssg.theme.switcher
   if (ssg.txServer && raw.txServer == null && raw['tx-server'] == null) cfg.txServer = ssg.txServer
   if (ssg.footer && !cfg.footer) cfg.footer = ssg.footer
   if (ssg.search != null && raw.search == null) cfg.search = ssg.search
