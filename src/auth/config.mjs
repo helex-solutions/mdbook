@@ -2,7 +2,7 @@
 //
 // Every key falls back to the environment variable its ecosystem already uses
 // (AUTH_OIDC_* are the Helex runtime-config names, OAUTH_* / AUTH_ROLE_CLAIMS /
-// GUEST_DISABLED the TermX ones), so a container can be fully configured from
+// GUEST_DISABLED the legacy ones), so a container can be fully configured from
 // env alone. Secrets accept `${VAR}` and are resolved against the environment —
 // they belong to the process running `mdbook serve`, never to the built site.
 import { expandEnv } from '../ingest/openapi.mjs'

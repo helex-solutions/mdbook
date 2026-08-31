@@ -19,7 +19,7 @@ test('normalizeAuth: config values win over env', () => {
   assert.equal(a.clientId, 'owlexicon')
 })
 
-test('normalizeAuth: env fallbacks (Helex names, then TermX names)', () => {
+test('normalizeAuth: env fallbacks (Helex names, then the legacy ones)', () => {
   const a = normalizeAuth({}, env({
     AUTH_OIDC_AUTHORITY: 'https://sso/realms/x',
     AUTH_OIDC_CLIENT_ID: 'owlexicon',

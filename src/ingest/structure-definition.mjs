@@ -1,4 +1,4 @@
-// Expands standalone `{{def:code; params}}` includes into the TermX
+// Expands standalone `{{def:code; params}}` includes into the vendored
 // StructureDefinition viewer web component, using the exported FHIR JSON
 // (the wiki export writes it to __source/resources/structure-definition/<code>.json).
 //

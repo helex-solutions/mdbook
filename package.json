@@ -1,7 +1,7 @@
 {
   "name": "mdbook",
   "version": "0.1.0",
-  "description": "Markdown + metadata static site generator. Turns TermX Wiki / GitBook content into a searchable, themeable, multilingual site. Ships as a GitHub Action.",
+  "description": "Markdown + metadata static site generator. Turns Owliki / GitBook content into a searchable, themeable, multilingual site. Ships as a GitHub Action.",
   "type": "module",
   "bin": {
     "mdbook": "bin/mdbook.mjs"
