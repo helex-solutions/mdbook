@@ -102,3 +102,30 @@ test('the emitted manifest pins the index chunk at the site default', () => {
   assert.equal(isAllowed(requirementFor(acl, chunk), null), false, 'anonymous is refused')
   assert.equal(isAllowed(requirementFor(acl, chunk), { roles: ['viewer'] }), true)
 })
+
+test('a generated PDF page is published but not indexed', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mdbook-search-pdf-'))
+  for (const [rel, content] of Object.entries({
+    '.mdbook/config.yml': 'site:\n  title: With PDFs\n',
+    'README.md': '# Home\n\nHome page.\n',
+    'guide/spec.pdf': '%PDF-1.4 fake\n'
+  })) {
+    const abs = path.join(dir, rel)
+    fs.mkdirSync(path.dirname(abs), { recursive: true })
+    fs.writeFileSync(abs, content)
+  }
+  const cfg = loadConfig(dir)
+  const staging = stageContent(cfg, ingestGitbook(cfg))
+
+  // The page exists — publishing is unchanged, only indexing is not.
+  const page = path.join(staging, 'guide/spec.md')
+  assert.ok(fs.existsSync(page), 'the PDF is still published as a page')
+  const text = fs.readFileSync(page, 'utf8')
+  assert.match(text, /^search: false$/m, 'but it is kept out of the search index')
+  // The file itself is still staged for the preview and the Download button.
+  assert.ok(fs.existsSync(path.join(staging, 'public/guide/spec.pdf')), 'the file is staged')
+
+  // An ordinary markdown page alongside it is unaffected.
+  const home = fs.readFileSync(path.join(staging, 'index.md'), 'utf8')
+  assert.ok(!/^search: false$/m.test(home), 'a markdown page is still indexed')
+})

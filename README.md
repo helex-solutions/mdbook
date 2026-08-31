@@ -329,6 +329,9 @@ The rules follow the ones markdown already uses:
   skipped — those files are already published as assets.
 - **On a gated site** the PDF inherits the access of the page that previews it, so the file
   cannot be fetched around the page (see [Authentication](#authentication)).
+- **Not in the search index.** The page carries none of the PDF's text — its body is the
+  preview card — so indexing it would add a result whose only searchable words are the file
+  name. It stays in the menu and on its breadcrumb trail; it is only absent from search.
 
 Set `source.pdf: false` to keep PDFs out of the site entirely.
 
