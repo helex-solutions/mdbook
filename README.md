@@ -113,7 +113,7 @@ in [Authentication](#authentication).
        steps:
          - uses: actions/checkout@v7
          - id: mdbook
-           uses: helex-solutions/mdbook@v1.7.0   # pin to a release tag (see Versioning)
+           uses: helex-solutions/mdbook@v1.8.0   # pin to a release tag (see Versioning)
            with: { project: . }
          - uses: actions/configure-pages@v6
          - uses: actions/upload-pages-artifact@v5
@@ -139,7 +139,7 @@ in [Authentication](#authentication).
 
 ### Versioning
 
-Pin the action to a **release tag** (e.g. `helex-solutions/mdbook@v1.7.0`) so your site builds are
+Pin the action to a **release tag** (e.g. `helex-solutions/mdbook@v1.8.0`) so your site builds are
 deterministic — `main` can move without silently redeploying your site. See the
 [releases](https://github.com/helex-solutions/mdbook/releases). Use `@main` only if you want the
 latest, unreleased changes.
@@ -148,19 +148,30 @@ There is deliberately **no floating `@v1`** to track: a moving major tag would r
 on someone else's schedule, which is the thing pinning exists to prevent. Every published tag is an
 exact version, so `@v1` resolves to nothing — upgrade by changing the pin.
 
-**Upgrading to `v1.7.0`.** One config change is required first, and only for wiki-export sites:
-`source.format` must read `owliki`. The format's earlier name was accepted as an alias through
-`v1.6.0`; from `v1.7.0` a config still carrying it is rejected by name, so the build stops with a
-message telling you to update rather than quietly building on a retired spelling. GitBook sites
-(`format: gitbook`, and anything auto-detected) need no change.
+**Upgrading to `v1.8.0`.** Two things change for wiki-export sites, both one line each.
+
+`comments.mapping` must read `owliki` if it carried the retired name. Both spellings resolved to
+the same discussion term — the page code — so changing the word keeps every existing thread; a
+config left alone stops threading by page code instead of silently threading by something else.
+The page code is published as `<meta name="owliki:page">`, and the earlier `termx:*` tags are no
+longer emitted.
+
+`{{def:}}` renders an include card naming the definition rather than a StructureDefinition element
+tree. The viewer that drew the tree came from a package this project no longer depends on, and the
+Helex equivalent does not yet ship in a form a static site can use. Sites that never shipped
+`resources/structure-definition/` — every wiki-published one — already saw the card and are
+unaffected.
+
+Sites on `v1.7.0` need nothing else, and GitBook sites (`format: gitbook`, and anything
+auto-detected) need nothing at all.
 
 **To publish a new mdbook version:**
 
 ```bash
-git tag -a v1.7.1 -m "…" && git push origin v1.7.1   # patch; v1.8.0 for features
+git tag -a v1.8.1 -m "…" && git push origin v1.8.1   # patch; v1.9.0 for features
 ```
 
-Then bump `@v1.7.0` → `@v1.7.1` in each consumer's `.github/workflows/mdbook.yml` and push —
+Then bump `@v1.8.0` → `@v1.8.1` in each consumer's `.github/workflows/mdbook.yml` and push —
 a deliberate step, so upgrades are reviewed rather than automatic.
 
 ## Local preview
@@ -678,7 +689,7 @@ such a host is cosmetic. Deploy the dist to your own server and run `serve` ther
 Action does this in one step:
 
 ```yaml
-- uses: helex-solutions/mdbook@v1.7.0
+- uses: helex-solutions/mdbook@v1.8.0
   with:
     project: .
     deploy-target: deploy@docs.example.org:/srv/docs/site
