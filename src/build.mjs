@@ -251,6 +251,13 @@ export function stageContent(cfg, model, openapiSpecs = {}) {
       if (f.tags?.length) extra.keywords = f.tags
       // Keep hand-picked pages out of the search index (they stay published).
       if (isSearchExcluded(f.dest)) extra.search = false
+      // A generated PDF page carries none of the PDF's text — its body is the
+      // file-embed card and a heading derived from the file name — so indexing
+      // it contributes a result whose only searchable words are that file name
+      // ("helexemr-for-it-managers.pdf" -> "Helexemr For It Managers"). The page
+      // stays published, in the menu and on its breadcrumb trail; it is only
+      // absent from search.
+      if (f.pdf) extra.search = false
       // A page must never reach a search-index chunk that a reader who cannot
       // open the page is allowed to fetch (see isSearchable in auth/acl.mjs).
       if (aclOpts && !isSearchable(access, aclOpts.siteDefault)) extra.search = false
