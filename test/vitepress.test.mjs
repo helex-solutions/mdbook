@@ -33,17 +33,15 @@ test('seoHead: content page emits og/canonical/wiki-ids/JSON-LD', () => {
     langs: ['en'], defaultLang: 'en', spaceCode: 'space1'
   })
   const tags = cfg.transformHead({
-    pageData: { relativePath: 'foo.md', title: 'Foo', description: 'Bar', frontmatter: { termxPage: 'p-1' } }
+    pageData: { relativePath: 'foo.md', title: 'Foo', description: 'Bar', frontmatter: { owlikiPage: 'p-1' } }
   })
   assert.ok(find(tags, (t) => t[1].property === 'og:title' && t[1].content === 'Foo'))
   assert.ok(find(tags, (t) => t[0] === 'link' && t[1].rel === 'canonical' && t[1].href === 'https://x.io/b/foo'))
-  // Both names, deliberately: `owliki:*` is what to read, `termx:*` is kept
-  // because published meta tags have readers this repo cannot see — and Giscus
-  // threads existing discussions off the old one.
   assert.ok(find(tags, (t) => t[1].name === 'owliki:page' && t[1].content === 'p-1'))
   assert.ok(find(tags, (t) => t[1].name === 'owliki:space' && t[1].content === 'space1'))
-  assert.ok(find(tags, (t) => t[1].name === 'termx:page' && t[1].content === 'p-1'))
-  assert.ok(find(tags, (t) => t[1].name === 'termx:space' && t[1].content === 'space1'))
+  // The retired spelling is gone, not merely superseded — a reader outside this
+  // repo stops finding it, which is the point of retiring a published name.
+  assert.ok(!find(tags, (t) => String(t[1].name).startsWith('termx:')), 'no legacy meta tag')
   const ld = JSON.parse(find(tags, (t) => t[0] === 'script' && t[1].type === 'application/ld+json')[2])
   assert.equal(ld['@type'], 'TechArticle')
   assert.equal(ld.url, 'https://x.io/b/foo')

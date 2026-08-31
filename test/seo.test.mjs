@@ -34,8 +34,8 @@ test('applySeoFrontmatter: never clobbers an existing key', () => {
   assert.match(out, /description: "D"/)
 })
 
-test('applySeoFrontmatter: extra keys (termxPage)', () => {
-  assert.match(applySeoFrontmatter('Body', { extra: { termxPage: 'abc-123' } }), /termxPage: "abc-123"/)
+test('applySeoFrontmatter: extra keys (owlikiPage)', () => {
+  assert.match(applySeoFrontmatter('Body', { extra: { owlikiPage: 'abc-123' } }), /owlikiPage: "abc-123"/)
 })
 
 test('applySeoFrontmatter: no-op when nothing to add', () => {
