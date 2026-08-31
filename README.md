@@ -90,7 +90,7 @@ in [Authentication](#authentication).
      title: My Docs
      lang: en
    source:
-     format: gitbook          # gitbook | termx  (auto-detected if omitted)
+     format: gitbook          # gitbook | owliki  (auto-detected if omitted)
    theme:
      skin: default            # default | ocean | paper | helex | taltech | hl7lt
    search: true
@@ -113,7 +113,7 @@ in [Authentication](#authentication).
        steps:
          - uses: actions/checkout@v7
          - id: mdbook
-           uses: helex-solutions/mdbook@v1.5.0   # pin to a release tag (see Versioning)
+           uses: helex-solutions/mdbook@v1.6.0   # pin to a release tag (see Versioning)
            with: { project: . }
          - uses: actions/configure-pages@v6
          - uses: actions/upload-pages-artifact@v5
@@ -139,7 +139,7 @@ in [Authentication](#authentication).
 
 ### Versioning
 
-Pin the action to a **release tag** (e.g. `helex-solutions/mdbook@v1.5.0`) so your site builds are
+Pin the action to a **release tag** (e.g. `helex-solutions/mdbook@v1.6.0`) so your site builds are
 deterministic — `main` can move without silently redeploying your site. See the
 [releases](https://github.com/helex-solutions/mdbook/releases). Use `@main` only if you want the
 latest, unreleased changes.
@@ -151,10 +151,10 @@ exact version, so `@v1` resolves to nothing — upgrade by changing the pin.
 **To publish a new mdbook version:**
 
 ```bash
-git tag -a v1.5.1 -m "…" && git push origin v1.5.1   # patch; v1.6.0 for features
+git tag -a v1.6.1 -m "…" && git push origin v1.6.1   # patch; v1.7.0 for features
 ```
 
-Then bump `@v1.5.0` → `@v1.5.1` in each consumer's `.github/workflows/mdbook.yml` and push —
+Then bump `@v1.6.0` → `@v1.6.1` in each consumer's `.github/workflows/mdbook.yml` and push —
 a deliberate step, so upgrades are reviewed rather than automatic.
 
 ## Local preview
@@ -182,8 +182,9 @@ site:
   web: https://example.org     # optional: base for cs:/vs:/page: web links
 
 source:
-  format: gitbook              # gitbook | termx  (auto-detected if omitted)
-  spaces:                      # termx only — multi-space portal (see Multi-space portals)
+  format: gitbook              # gitbook | owliki  (auto-detected if omitted; `termx` is
+                               #   the former name of `owliki` and still works)
+  spaces:                      # owliki only — multi-space portal (see Multi-space portals)
     handbook: spaces/handbook  #   mount key -> wiki-ssg export dir
     api: spaces/api
   pdf: true                    # gitbook only — publish repo PDFs as pages (see PDFs)
@@ -613,9 +614,8 @@ auth:
 ```
 
 A page overrides its section with frontmatter — `access: public | authenticated | [role, …]` —
-Confluence-style. The build resolves everything into an `acl.json` manifest next to the dist and
-keeps protected pages **out of the search index**; enforcement is the job of the **`serve`**
-command:
+Confluence-style. The build resolves everything into an `acl.json` manifest next to the dist;
+enforcement is the job of the **`serve`** command:
 
 ```bash
 mdbook serve --project . --port 8080        # behind nginx (TLS); --build to build first
@@ -637,6 +637,13 @@ unstyled. The post-logout landing is rendered the same way, for the same reason.
 Gating the **whole** site (`access: [viewer]` with no public section) is supported and is a
 different operational proposition: signing in no longer implies reading, so every new reader needs
 a role assigned before they see anything. Give the realm a default role, or plan for that step.
+
+**Search on a gated site.** The local search index is one static chunk, so everyone who can fetch
+it can read the text of every page inside. `serve` gates that chunk at the site default, and the
+build indexes a page only when that audience can also open the page — on a site gated at `viewer`
+every `viewer` page is searchable, and a page restricted further (`access: [admin]`) is not
+indexed at all, not even for an admin. Restrict a section only when you mean to lose it from
+search as well; `search.exclude` is the lever when you want a page published but unindexed.
 
 Bearer JWTs are accepted too, verified against the configured issuer(s) —
 `auth.issuers` lets one site accept several IdPs. Behind a gateway that already authenticates
@@ -662,7 +669,7 @@ such a host is cosmetic. Deploy the dist to your own server and run `serve` ther
 Action does this in one step:
 
 ```yaml
-- uses: helex-solutions/mdbook@v1.5.0
+- uses: helex-solutions/mdbook@v1.6.0
   with:
     project: .
     deploy-target: deploy@docs.example.org:/srv/docs/site
