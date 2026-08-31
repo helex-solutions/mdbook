@@ -12,10 +12,10 @@ import Related from './related.mjs'
 import Zoom from './zoom.mjs'
 import OpenApi from './openapi.mjs'
 import Auth from './auth.mjs'
+import { renderMermaid } from './mermaid.mjs'
 import './styles/base.css'
 import './styles/smart-text.css'
 
-// Render every `.mermaid-diagram` placeholder produced by the markdown layer.
 // Register the vendored TermX StructureDefinition viewer web component
 // (<tx-sd-view>) once, on the client.
 async function registerSdViewer() {
@@ -39,39 +39,6 @@ function markCurrentLink() {
   })
 }
 
-async function renderMermaid() {
-  if (typeof document === 'undefined') return
-  const nodes = document.querySelectorAll('.mermaid-diagram:not([data-rendered])')
-  if (!nodes.length) return
-  const mermaid = (await import('mermaid')).default
-  const dark = document.documentElement.classList.contains('dark')
-  // Diagram source is page content, so both safety settings are STATED rather
-  // than inherited from whatever the installed mermaid defaults to — the same
-  // two the wiki's own renderer states (helex-tx `mermaidRenderer.ts`):
-  //   securityLevel: 'strict' runs mermaid's DOMPurify over the SVG it generates
-  //     and disables `click` bindings.
-  //   htmlLabels: false keeps labels as SVG <text> instead of live HTML inside a
-  //     foreignObject. This is the ROOT-level key: since mermaid 11.17 the
-  //     per-diagram `flowchart.htmlLabels` is deprecated and the root one
-  //     overrides it, so setting only the nested one silently does nothing.
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: 'strict',
-    htmlLabels: false,
-    theme: dark ? 'dark' : 'default'
-  })
-  let i = 0
-  for (const el of nodes) {
-    el.setAttribute('data-rendered', '1')
-    const src = decodeURIComponent(el.getAttribute('data-src') || '')
-    try {
-      const { svg } = await mermaid.render(`mdbook-mermaid-${Date.now()}-${i++}`, src)
-      el.innerHTML = svg
-    } catch (e) {
-      el.innerHTML = `<pre class="mermaid-error">Mermaid error: ${e?.message || e}</pre>`
-    }
-  }
-}
 
 export default {
   extends: DefaultTheme,
