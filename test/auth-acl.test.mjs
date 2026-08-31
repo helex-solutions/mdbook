@@ -6,7 +6,9 @@ import {
   buildAclManifest,
   requirementFor,
   isAllowed,
-  readAccessFrontmatter
+  readAccessFrontmatter,
+  isSearchable,
+  SEARCH_INDEX_PREFIX
 } from '../src/auth/acl.mjs'
 
 test('resolveAccess: frontmatter override > rule > default', () => {
@@ -98,4 +100,43 @@ test('readAccessFrontmatter forms', () => {
   assert.deepEqual(readAccessFrontmatter("---\naccess: ['a', \"b\"]\n---\n"), ['a', 'b'])
   assert.deepEqual(readAccessFrontmatter('---\naccess: wiki-handbook\n---\n'), ['wiki-handbook'])
   assert.deepEqual(readAccessFrontmatter('---\ntitle: X\naccess:\n  - editor\n  - admin\n---\n'), ['editor', 'admin'])
+})
+
+test('isSearchable: a page is indexed only if the chunk audience can read it', () => {
+  // Public site: the chunk is public, so only public pages may go in it.
+  assert.equal(isSearchable('public', 'public'), true)
+  assert.equal(isSearchable('authenticated', 'public'), false)
+  assert.equal(isSearchable(['viewer'], 'public'), false)
+
+  // Wholly gated site — the regression this fixes: every page carries the site
+  // default, so every page is indexable and the index is no longer empty.
+  assert.equal(isSearchable(['viewer'], ['viewer']), true)
+  assert.equal(isSearchable('authenticated', 'authenticated'), true)
+
+  // A public page inside a gated site is safe: its readers are a superset.
+  assert.equal(isSearchable('public', ['viewer']), true)
+  // Any session satisfies `authenticated`, and the chunk already needs one.
+  assert.equal(isSearchable('authenticated', ['viewer']), true)
+  // But a role the chunk does not demand must stay out.
+  assert.equal(isSearchable(['viewer'], 'authenticated'), false)
+
+  // Mixed role sets: the chunk's roles must all open the page.
+  assert.equal(isSearchable(['viewer', 'admin'], ['viewer']), true)
+  assert.equal(isSearchable(['admin'], ['viewer']), false)
+  assert.equal(isSearchable(['admin'], ['viewer', 'admin']), false)
+
+  // Unset means public on either side.
+  assert.equal(isSearchable(null, null), true)
+  assert.equal(isSearchable(['viewer'], null), false)
+})
+
+test('the search index chunk is pinned at the site default', () => {
+  const m = buildAclManifest({
+    entries: [],
+    rules: [],
+    assets: [{ prefix: SEARCH_INDEX_PREFIX, access: ['viewer'] }],
+    siteDefault: ['viewer']
+  })
+  assert.deepEqual(requirementFor(m, '/assets/chunks/@localSearchIndexroot.abc123.js'), ['viewer'])
+  assert.equal(isAllowed(requirementFor(m, SEARCH_INDEX_PREFIX + 'root.js'), null), false)
 })
