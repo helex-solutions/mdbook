@@ -353,9 +353,6 @@ function ingestPortal(cfg) {
     attachmentDirs: spaces
       .map(({ mount, dir }) => ({ mount, srcDir: path.join(cfg.projectRoot, dir, 'attachments') }))
       .filter((a) => fs.existsSync(a.srcDir)),
-    resourceDirs: spaces.map(({ dir }) =>
-      path.join(cfg.projectRoot, dir, 'resources', 'structure-definition')
-    ),
     assets: []
   }
 }

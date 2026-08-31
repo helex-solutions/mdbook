@@ -763,7 +763,6 @@ Each config option, and a project that uses it:
 | `nav` | hl7lt-website |
 | `locales` (per-locale menu labels/links) | hl7lt-website |
 | `tx-server` (`{{csc:}}` / `{{vsc:}}` tables, `cs:` / `vs:` links) | tutorial |
-| `{{def:}}` StructureDefinition viewer | tutorial |
 | `{.card-grid}` card grids | hl7lt-website, tutorial |
 | Multilingual + locale-switch redirect stubs (`pages.json`) | hl7lt-website, tutorial |
 | `comments` (Giscus) | see [Comments](#comments-github-discussions) above |
