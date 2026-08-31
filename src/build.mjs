@@ -37,9 +37,22 @@ function log(msg) {
   console.log(pc.cyan('mdbook'), msg)
 }
 
+// Formats that were renamed, and what they became. Recognised in order to be
+// REJECTED, not aliased: a repository carrying the old spelling should be
+// updated, and a build that says exactly which line to change costs nothing.
+const RENAMED_FORMATS = { termx: 'owliki' }
+
 function ingest(cfg) {
-  const adapter = ADAPTERS[cfg.source.format]
-  if (!adapter) throw new Error(`Unknown source format: ${cfg.source.format}`)
+  const format = cfg.source.format
+  const adapter = ADAPTERS[format]
+  if (!adapter) {
+    const renamed = RENAMED_FORMATS[format]
+    throw new Error(
+      renamed
+        ? `source.format: ${format} is no longer supported — it is now "${renamed}". Update .mdbook/config.yml.`
+        : `Unknown source format: ${format}`
+    )
+  }
   return adapter(cfg)
 }
 

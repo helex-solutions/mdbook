@@ -134,11 +134,10 @@ test('applySpaceConfig: no-op when the space has no ssg block', () => {
   assert.equal(cfg.txServer, null)
 })
 
-test('source format: `termx` still resolves to `owliki`', () => {
-  // Every site already published with mdbook has `format: termx` in its config.
-  // A format name is a contract with those repositories: renaming it without an
-  // alias would turn the next release into "Unknown source format" for all of
-  // them. `owliki` is the name to write in new configs.
+test('source format: a retired format name is not normalized away', () => {
+  // The former wiki-format name is NOT an alias. loadConfig keeps the raw
+  // spelling so the build can reject it BY NAME (see test/format.test.mjs);
+  // silently normalizing it would let a stale config build forever.
   const dir = tmpProject()
   fs.mkdirSync(path.join(dir, '.mdbook'), { recursive: true })
   fs.writeFileSync(
@@ -146,6 +145,6 @@ test('source format: `termx` still resolves to `owliki`', () => {
     'source:\n  format: termx\n  meta: docs\n'
   )
   const cfg = loadConfig(dir)
-  assert.equal(cfg.source.format, 'owliki', 'the alias resolves')
-  assert.equal(cfg.source.meta, 'docs', 'and the rest of the source block survives it')
+  assert.equal(cfg.source.format, 'termx', 'not rewritten to owliki')
+  assert.equal(cfg.source.meta, 'docs', 'and the rest of the source block survives')
 })
