@@ -12,13 +12,20 @@ import { ingestOwliki } from '../src/ingest/owliki.mjs'
 // A format that resolved in config but never reached that branch would publish
 // raw macro text, and nothing would say so.
 //
-// The wiki format's former name, `termx`, is NOT an alias. It is rejected by
-// name, which is the other half of what these tests hold in place: a repository
-// still carrying it must be told, not quietly built on a retired spelling.
+// The wiki format's former name is NOT an alias. It is rejected like any other
+// unusable value, which is the other half of what these tests hold in place: a
+// repository still carrying it is told, not quietly built on a retired spelling.
+// The name lives in this file's fixture constant only — the source has no table
+// of superseded spellings, because such a table is that name living on.
 //
 // This drives the real ingest + staging. It stops short of handing the staged
 // tree to VitePress: that step is VitePress's behaviour, not this repo's, and
 // paying ~7s per build would change what this suite is.
+
+// The retired spelling. A test that a value is rejected has to produce that
+// value, so it is written plainly here and nowhere in src/ — the point of this
+// constant is that the name lives in the fixtures and not in the generator.
+const RETIRED_WIKI_FORMAT = 'termx'
 
 const PAGE = `# Macros
 
@@ -72,23 +79,26 @@ test('format owliki: the macro resolves through real ingest and staging', () => 
   )
 })
 
-test('format termx: retired, and rejected by name rather than half-built', async () => {
-  // The failure a stale config must get. Not "Unknown source format", which
-  // sends someone hunting for a typo, and emphatically not a silent alias.
+test('an unusable format is rejected at ingest, listing what is accepted', async () => {
+  // The retired wiki-format name is one of these and gets no special case: the
+  // message names the accepted formats rather than mapping old spellings to new,
+  // so a superseded name does not live on in the source to explain itself.
   // `buildSite` is async, so the throw arrives as a rejection — and it has to
   // arrive at ingest, before anything is staged or a bundler is started.
-  const dir = fixture('termx')
-  const cfg = loadConfig(dir)
-  await assert.rejects(
-    () => buildSite(dir),
-    (e) => {
-      assert.match(e.message, /no longer supported/)
-      assert.match(e.message, /owliki/, 'names the replacement')
-      assert.match(e.message, /config\.yml/, 'and where to change it')
-      return true
-    }
-  )
-  assert.equal(cfg.source.format, 'termx', 'the raw spelling survives config, to be rejected')
+  for (const bad of ['nonesuch', RETIRED_WIKI_FORMAT]) {
+    const dir = fixture(bad)
+    assert.equal(loadConfig(dir).source.format, bad, 'the raw spelling survives config')
+    await assert.rejects(
+      () => buildSite(dir),
+      (e) => {
+        assert.match(e.message, /Unknown source\.format/)
+        assert.match(e.message, /owliki/, 'names what to write instead')
+        assert.match(e.message, /gitbook/, 'and the other accepted format')
+        return true
+      },
+      bad
+    )
+  }
 })
 
 test('format gating: the wiki transforms are gated on the format, not unconditional', () => {

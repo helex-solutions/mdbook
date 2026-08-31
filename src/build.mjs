@@ -36,20 +36,17 @@ function log(msg) {
   console.log(pc.cyan('mdbook'), msg)
 }
 
-// Formats that were renamed, and what they became. Recognised in order to be
-// REJECTED, not aliased: a repository carrying the old spelling should be
-// updated, and a build that says exactly which line to change costs nothing.
-const RENAMED_FORMATS = { termx: 'owliki' }
-
 function ingest(cfg) {
   const format = cfg.source.format
   const adapter = ADAPTERS[format]
   if (!adapter) {
-    const renamed = RENAMED_FORMATS[format]
+    // One message for every unusable value, listing what IS accepted. A table of
+    // superseded spellings mapped to their replacements would read better for the
+    // one person upgrading, and would mean carrying those names in the source
+    // indefinitely — a retired name that lives on in an error is still a retired
+    // name that lives on. The accepted list tells anyone what to write.
     throw new Error(
-      renamed
-        ? `source.format: ${format} is no longer supported — it is now "${renamed}". Update .mdbook/config.yml.`
-        : `Unknown source format: ${format}`
+      `Unknown source.format: ${format}. Accepted: ${Object.keys(ADAPTERS).sort().join(', ')}.`
     )
   }
   return adapter(cfg)
