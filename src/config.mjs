@@ -24,16 +24,12 @@ const SOURCE_DEFAULTS = {
   owliki: { meta: '__source', pages: 'input', assets: 'files' }
 }
 
-// `format: termx` was this format's name before the wiki was called Owliki, and
-// it is written into the config of every site already published with mdbook. It
-// keeps working: a format name is a contract with those repositories, and
-// renaming one without an alias turns the next release into "Unknown source
-// format" for all of them. `owliki` is the name to write in new configs.
-const FORMAT_ALIASES = { termx: 'owliki' }
-
+// The wiki-export format is `owliki`. Its former name is NOT accepted: a config
+// naming it is rejected by name in `ingest()` (src/build.mjs) rather than
+// silently normalized, so a repository still carrying it is told to update
+// instead of building on a retired spelling forever.
 function normalizeFormat(format) {
-  const f = String(format).toLowerCase()
-  return FORMAT_ALIASES[f] || f
+  return String(format).toLowerCase()
 }
 
 export function loadConfig(projectRoot, overrides = {}) {
@@ -68,8 +64,8 @@ export function loadConfig(projectRoot, overrides = {}) {
     source: {
       ...sourceDefaults,
       ...(data.source || {}),
-      // Resolved last so it wins over the spread: `data.source.format` is the raw
-      // spelling, and an alias (`termx`) has to survive to the normalized name.
+      // Resolved last so it wins over the spread — `data.source.format` is the
+      // raw spelling and everything downstream compares the normalized one.
       format
     },
     // FHIR terminology server base (…/fhir) for expanding {{csc:}}/{{vsc:}} at
