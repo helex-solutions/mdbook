@@ -18,7 +18,6 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY bin ./bin
 COPY src ./src
-COPY vendor ./vendor
 
 # A wrapper rather than a symlink: bin/mdbook.mjs is mode 644 in git, so the
 # entry point must not depend on the execute bit surviving the copy.
