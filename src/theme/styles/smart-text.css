@@ -1,8 +1,8 @@
-/* Styling for TermX / Wiki.js "smart text" produced by the markdown plugins. */
+/* Styling for Owliki / Wiki.js "smart text" produced by the markdown plugins. */
 
 /* Callout blockquotes: `> text {.is-info}` etc. markdown-it-attrs puts the class
  * on the inner <p>, so match the blockquote that contains it (also support the
- * class landing directly on the blockquote). Semantic colours like the TermX SSG. */
+ * class landing directly on the blockquote). Semantic colours like the reference SSG. */
 .vp-doc blockquote:has(> .is-info),
 .vp-doc blockquote:has(> .is-warning),
 .vp-doc blockquote:has(> .is-success),
@@ -26,7 +26,7 @@
 .vp-doc blockquote > p.is-success,
 .vp-doc blockquote > p.is-error { margin: 0; }
 
-/* Link lists: `- [..](..)` list tagged {.links-list}. Mirrors the TermX SSG:
+/* Link lists: `- [..](..)` list tagged {.links-list}. Mirrors the reference SSG:
  * shadow cards with a 4px left accent bar that turns brand-coloured on the
  * current row (hover, or the item linking to the current page). A link's
  * trailing `*em*` becomes a divider-separated subtitle section. */
@@ -209,6 +209,20 @@
 .vp-doc .mermaid-diagram:not([data-rendered]) .mermaid-fallback {
   display: block;
   opacity: 0.6;
+}
+/* A ```plantuml fence with no server configured: the source, left readable. */
+.vp-doc .mdbook-plantuml-source { margin: 1rem 0; }
+
+/* `{{drawio:name}}` that resolved to no file. Visible and named on purpose —
+   this is what makes an edited macro or a deleted diagram diagnosable against
+   the wiki's Files panel, where a broken image would say nothing. */
+.vp-doc .mdbook-diagram-missing {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px dashed var(--vp-c-warning-1, var(--vp-c-divider));
+  border-radius: 4px;
+  color: var(--vp-c-text-2);
+  font-size: 0.9em;
 }
 
 /* Concept matrices: {{csc:…}} / {{vsc:…}} expanded from the FHIR server. */

@@ -1,4 +1,4 @@
-// Expands TermX `{{csc:…}}` / `{{vsc:…}}` include directives into concept tables
+// Expands Owliki `{{csc:…}}` / `{{vsc:…}}` include directives into concept tables
 // by fetching from a FHIR terminology server at build time (config `txServer`).
 //
 //   {{csc:code|version; properties=display,code; langs=en; limit=10}}

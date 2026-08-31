@@ -45,7 +45,21 @@ async function renderMermaid() {
   if (!nodes.length) return
   const mermaid = (await import('mermaid')).default
   const dark = document.documentElement.classList.contains('dark')
-  mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default' })
+  // Diagram source is page content, so both safety settings are STATED rather
+  // than inherited from whatever the installed mermaid defaults to — the same
+  // two the wiki's own renderer states (helex-tx `mermaidRenderer.ts`):
+  //   securityLevel: 'strict' runs mermaid's DOMPurify over the SVG it generates
+  //     and disables `click` bindings.
+  //   htmlLabels: false keeps labels as SVG <text> instead of live HTML inside a
+  //     foreignObject. This is the ROOT-level key: since mermaid 11.17 the
+  //     per-diagram `flowchart.htmlLabels` is deprecated and the root one
+  //     overrides it, so setting only the nested one silently does nothing.
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: 'strict',
+    htmlLabels: false,
+    theme: dark ? 'dark' : 'default'
+  })
   let i = 0
   for (const el of nodes) {
     el.setAttribute('data-rendered', '1')
@@ -74,7 +88,7 @@ export default {
     const route = useRoute()
     const router = useRouter()
     const { frontmatter } = useData()
-    // Locale-switch redirect stubs (see src/ingest/termx.mjs): a page carrying a
+    // Locale-switch redirect stubs (see src/ingest/owliki.mjs): a page carrying a
     // `redirect` front-matter bounces to its real translation. This makes the
     // language switcher land on the translated page even when its slug differs
     // per locale (e.g. /lt/build -> /lt/versijos).

@@ -4,7 +4,7 @@
 // runs after markdown-it-attrs, finds such an orphaned `{…}` paragraph immediately
 // after a table, and applies it to the table element instead (then drops the
 // paragraph). This is what makes `{.dense}` (and other attrs) work on tables, so
-// they render the same as in the TermX Wiki. See docs/termx-wiki-compatibility.md §7.1.
+// they render the same as in the wiki. See docs/owliki-compatibility.md §7.1.
 const CURLY_ONLY = /^\s*(\{[.#][^}]*\})\s*$/
 
 function applyCurly(token, curly) {

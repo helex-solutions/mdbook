@@ -92,7 +92,7 @@ access: [admin]        # or: authenticated | public
 ---
 ```
 
-Effective ACL = page frontmatter → longest-matching rule → site default. For `termx`-format
+Effective ACL = page frontmatter → longest-matching rule → site default. For `owliki`-format
 projects the same value can arrive per page node in `pages.json` (`access` field — an additive
 extension of the wiki-ssg contract) and as site defaults in `space.json`'s `ssg.auth` block; the
 repo's own config wins, as with every other `ssg` field.
@@ -250,9 +250,9 @@ login for the whole portal.
 ## Macro parity contract
 
 mdbook's build-time renderers are the static half of the Owlexicon macro registry: diagrams
-(`src/markdown/diagrams.mjs`), termx links (`src/markdown/termx-links.mjs`), structure
+(`src/markdown/diagrams.mjs`), wiki links (`src/markdown/owliki-links.mjs`), structure
 definitions (`src/ingest/structure-definition.mjs`), concept matrices
 (`src/ingest/concept-matrix.mjs`), tabsets/collapsibles/cards, OpenAPI blocks. A macro added to
 the wiki editor must either reduce to one of the canonical syntaxes in
-[`termx-wiki-compatibility.md`](termx-wiki-compatibility.md) or land its static renderer here in
+[`owliki-compatibility.md`](owliki-compatibility.md) or land its static renderer here in
 the same change — that compatibility matrix is the contract document between the two codebases.

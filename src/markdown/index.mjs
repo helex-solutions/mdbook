@@ -1,5 +1,5 @@
 // mdbook markdown layer.
-// VitePress uses markdown-it, so TermX Wiki's markdown-it plugins run here
+// VitePress uses markdown-it, so Owliki's markdown-it plugins run here
 // directly. `applyMarkdown(md, opts)` is called from the VitePress `markdown.config`
 // hook. Each plugin is small and independently toggleable.
 import attrs from 'markdown-it-attrs'
@@ -9,9 +9,9 @@ import sub from 'markdown-it-sub'
 import sup from 'markdown-it-sup'
 import footnote from 'markdown-it-footnote'
 import taskLists from 'markdown-it-task-lists'
-import { termxLinks, mountFromPath } from './termx-links.mjs'
-import { termxImages } from './termx-images.mjs'
-import { termxEmbeds } from './termx-embeds.mjs'
+import { owlikiLinks, mountFromPath } from './owliki-links.mjs'
+import { owlikiImages } from './owliki-images.mjs'
+import { owlikiEmbeds } from './owliki-embeds.mjs'
 import { collapsible } from './collapsible.mjs'
 import { tabset } from './tabset.mjs'
 import { cardGrid } from './card-grid.mjs'
@@ -20,7 +20,7 @@ import { codeCitation } from './code-citation.mjs'
 import { tableAttrs } from './table-attrs.mjs'
 
 export function applyMarkdown(md, opts = {}) {
-  // Community plugins matching the TermX Wiki renderer's syntax.
+  // Community plugins matching the wiki renderer's syntax.
   md.use(attrs, { allowedAttributes: [] }) // {.is-info} {width=800 align=right} …
   md.use(multimdTable, { multiline: true, rowspan: true, headerless: true }) // ^^ ||| headerless tables
 
@@ -57,15 +57,15 @@ export function applyMarkdown(md, opts = {}) {
   md.use(footnote) // [^1]
   md.use(taskLists, { label: false })
 
-  // TermX-specific "smart text".
-  md.use(termxEmbeds) // {{def:…}} {{csc:…}} {{vsc:…}} -> Vue-safe inline code
+  // Owliki-specific "smart text".
+  md.use(owlikiEmbeds) // {{def:…}} {{csc:…}} {{vsc:…}} -> Vue-safe inline code
   md.use(collapsible) // +++ Title … +++  ->  <details>
   md.use(tabset) // ## {.tabset} + ### tabs  ->  pure-CSS tabs
   md.use(cardGrid) // list {.card-grid}  ->  card grid with cover/title/desc/buttons
   md.use(diagrams, opts) // ```drawio ```plantuml ```mermaid
   md.use(codeCitation) // ```43:58:path/File.java -> highlighted java + a file caption
-  md.use(termxLinks, opts) // [t](page:slug) [t](cs:code) [t](vs:code) [t](concept:cs|code)
-  md.use(termxImages, opts) // ![](files/<pageId>/<file>)
+  md.use(owlikiLinks, opts) // [t](page:slug) [t](cs:code) [t](vs:code) [t](concept:cs|code)
+  md.use(owlikiImages, opts) // ![](files/<pageId>/<file>)
 
   for (const p of opts.extraPlugins || []) md.use(p, opts)
 
@@ -79,4 +79,4 @@ export function applyMarkdown(md, opts = {}) {
   }
 }
 
-export { termxLinks, termxImages, mountFromPath, collapsible, cardGrid }
+export { owlikiLinks, owlikiImages, mountFromPath, collapsible, cardGrid }

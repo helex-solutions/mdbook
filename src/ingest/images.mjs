@@ -4,6 +4,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { walkMarkdown } from './util.mjs'
+import { mountFromPath } from '../markdown/owliki-links.mjs'
 
 const IMG_RE = /!\[([^\]]*)\]\(([^)\s]+)(\s+"[^"]*")?\)/g
 const EXTERNAL = /^(https?:)?\/\//i
@@ -17,14 +18,18 @@ function exists(p) {
 }
 
 // Decide the replacement for one image reference.
-function resolveOne(alt, src, fileDir, staging) {
+function resolveOne(alt, src, fileDir, staging, mount) {
   if (EXTERNAL.test(src) || src.startsWith('data:')) return null // keep as-is
 
-  // TermX attachment convention -> public/attachments/<folder>/<file>.
+  // Owliki attachment convention -> public/attachments/[<mount>/]<folder>/<file>.
+  // A portal namespaces attachments per mount so page ids from different Owliki
+  // instances cannot collide, and the page's own mount comes from where it is
+  // staged — the same derivation `owlikiImages` makes from env.relativePath.
   const filesM = src.match(/^files\/([\w.-]+)\/(.+)$/)
   if (filesM) {
-    const pub = path.join(staging, 'public', 'attachments', filesM[1], filesM[2])
-    return exists(pub) ? `![${alt}](/attachments/${filesM[1]}/${filesM[2]})` : `*${alt || 'image'}*`
+    const asset = mount ? `${mount}/${filesM[1]}/${filesM[2]}` : `${filesM[1]}/${filesM[2]}`
+    const pub = path.join(staging, 'public', 'attachments', asset)
+    return exists(pub) ? `![${alt}](/attachments/${asset})` : `*${alt || 'image'}*`
   }
 
   // Absolute (public) path.
@@ -39,13 +44,15 @@ function resolveOne(alt, src, fileDir, staging) {
   return exists(rel) ? null : `*${alt || 'image'}*`
 }
 
-export function fixStagedImages(staging) {
+export function fixStagedImages(staging, portal = null) {
   for (const file of walkMarkdown(staging, { exclude: ['node_modules', 'public'] })) {
     const dir = path.dirname(file)
+    const rel = path.relative(staging, file).split(path.sep).join('/')
+    const mount = portal ? mountFromPath(rel, portal) : null
     const text = fs.readFileSync(file, 'utf8')
     let changed = false
     const next = text.replace(IMG_RE, (whole, alt, src, title) => {
-      const repl = resolveOne(alt, decodeURI(src), dir, staging)
+      const repl = resolveOne(alt, decodeURI(src), dir, staging, mount)
       if (repl == null) return whole
       changed = true
       return repl

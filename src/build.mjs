@@ -6,9 +6,9 @@ import { fileURLToPath } from 'node:url'
 import pc from 'picocolors'
 import { loadConfig, applySpaceConfig } from './config.mjs'
 import { ingestGitbook } from './ingest/gitbook.mjs'
-import { ingestTermx } from './ingest/termx.mjs'
+import { ingestOwliki } from './ingest/owliki.mjs'
 import { copyDir, makeExcluder } from './ingest/util.mjs'
-import { sanitizeTermxMarkdown, hardenMarkdown } from './ingest/sanitize.mjs'
+import { sanitizeOwlikiMarkdown, hardenMarkdown } from './ingest/sanitize.mjs'
 import { buildDocIndex, relatedFor } from './ingest/related.mjs'
 import { fixStagedImages } from './ingest/images.mjs'
 import { transformGitbookCards } from './ingest/cards.mjs'
@@ -16,6 +16,7 @@ import { transformFileEmbeds } from './ingest/file-embed.mjs'
 import { applySeoFrontmatter, deriveDescription } from './ingest/seo.mjs'
 import { auditLinks } from './ingest/links.mjs'
 import { expandStructureDefinitions } from './ingest/structure-definition.mjs'
+import { expandDiagrams, readAttachmentIndex } from './ingest/drawio.mjs'
 import { expandConceptMatrices } from './ingest/concept-matrix.mjs'
 import { loadOpenapiSpecs, authFromSchemes } from './ingest/openapi.mjs'
 import { expandOpenapi } from './ingest/openapi-render.mjs'
@@ -30,7 +31,7 @@ import { normalizeAccess } from './auth/config.mjs'
 
 const MDBOOK_SRC = path.dirname(fileURLToPath(import.meta.url)) // .../mdbook/src
 
-const ADAPTERS = { gitbook: ingestGitbook, termx: ingestTermx }
+const ADAPTERS = { gitbook: ingestGitbook, owliki: ingestOwliki }
 
 function log(msg) {
   console.log(pc.cyan('mdbook'), msg)
@@ -53,7 +54,7 @@ function reportDeadLinks(staging, model) {
   if (dead.length > 25) console.log(`  … and ${dead.length - 25} more`)
 }
 
-// The TermX web UI origin, derived from the FHIR server (…/api/fhir or …/fhir).
+// The Helex TX web UI origin, derived from the FHIR server (…/api/fhir or …/fhir).
 function webFromTxServer(txServer) {
   return txServer ? txServer.replace(/\/(api\/)?fhir\/?$/i, '') : null
 }
@@ -116,7 +117,8 @@ function makeBundle(cfg, model) {
     outDir: cfg.build.out,
     cleanUrls: cfg.build.cleanUrls,
     assetBase: '/attachments',
-    breaks: cfg.source.format === 'termx' // TermX Wiki uses breaks:true
+    plantumlServer: cfg.diagrams?.plantumlServer || null,
+    breaks: cfg.source.format === 'owliki' // the wiki renders single newlines as <br>
   }
 }
 
@@ -156,7 +158,7 @@ export function stageContent(cfg, model, openapiSpecs = {}) {
   }
 
   // Copy content files, running markdown through the transform pipeline.
-  const isTermx = cfg.source.format === 'termx'
+  const isOwliki = cfg.source.format === 'owliki'
   const isSearchExcluded = makeExcluder(cfg.searchExclude || [])
   // Site authentication: resolve each page's effective access (frontmatter /
   // pages.json override -> config rule -> site default) while staging, so the
@@ -171,6 +173,18 @@ export function stageContent(cfg, model, openapiSpecs = {}) {
   // Which staged folders actually have an index page — a breadcrumb for a folder
   // without one is shown as plain text rather than a link to a 404.
   const destSet = new Set(model.contentFiles.map((f) => f.dest))
+  // Exported attachment folders, read once. `{{drawio:name}}` resolves against
+  // this (src/ingest/drawio.mjs) while the page is staged, which is before the
+  // tree is copied under public/ further down — hence the source dirs, not the
+  // staged ones. A portal keeps one index per mount, as it keeps one attachment
+  // namespace per mount.
+  const attachmentSources = model.attachmentDirs || [
+    { mount: null, srcDir: path.join(cfg.projectRoot, cfg.source.meta || '__source', 'attachments') }
+  ]
+  const attachmentIndex = new Map(
+    attachmentSources.map((a) => [a.mount ?? null, readAttachmentIndex(a.srcDir)])
+  )
+  const diagramWarnings = []
   const sdDirs = model.resourceDirs || [
     path.join(cfg.projectRoot, cfg.source.meta || '__source', 'resources', 'structure-definition'),
     path.join(cfg.projectRoot, 'input', 'resources', 'structure-definition')
@@ -203,9 +217,16 @@ export function stageContent(cfg, model, openapiSpecs = {}) {
           }
         }
       }
-      if (isTermx) {
-        text = sanitizeTermxMarkdown(text)
+      if (isOwliki) {
+        text = sanitizeOwlikiMarkdown(text)
         text = expandStructureDefinitions(text, sdDirs) // {{def:…}} -> <tx-sd-view>
+        // {{drawio:name}} -> the newest version of that diagram, as an ordinary
+        // `files/<folder>/…` embed the attachment pipeline resolves like any other.
+        text = expandDiagrams(text, {
+          index: attachmentIndex.get(f.mount ?? null),
+          folder: f.attachments,
+          warn: (msg) => diagramWarnings.push(`${f.dest}: ${msg}`)
+        })
       }
       // Expand {% openapi %} blocks before hardening, so text pulled out of a
       // spec is sanitized on the same terms as authored prose.
@@ -221,7 +242,7 @@ export function stageContent(cfg, model, openapiSpecs = {}) {
       text = transformFileEmbeds(text, cfg.site.base) // {% file %} -> PDF/download card
       // Per-page <title>/<meta description>/<meta keywords>: authored description
       // (else a first-paragraph summary), and page tags exported as keywords.
-      // `termxPage` carries the stable TermX page code (for comment threading etc.).
+      // `termxPage` carries the stable wiki page code (for comment threading etc.).
       const extra = {}
       if (f.code) extra.termxPage = f.code
       if (f.tags?.length) extra.keywords = f.tags
@@ -290,21 +311,28 @@ export function stageContent(cfg, model, openapiSpecs = {}) {
     copyDir(a.srcDir, path.join(staging, 'public', a.destDir))
   }
 
-  // TermX attachments -> public/attachments (served from site root). A portal
+  // Owliki attachments -> public/attachments (served from site root). A portal
   // namespaces them per mount so page ids from different instances can't collide.
-  if (model.attachmentDirs) {
-    for (const a of model.attachmentDirs) {
-      copyDir(a.srcDir, path.join(staging, 'public', 'attachments', a.mount))
-    }
-  } else {
-    const attachments = path.join(cfg.projectRoot, cfg.source.meta || '__source', 'attachments')
-    if (fs.existsSync(attachments)) {
-      copyDir(attachments, path.join(staging, 'public', 'attachments'))
-    }
+  for (const a of attachmentSources) {
+    if (!fs.existsSync(a.srcDir)) continue
+    copyDir(a.srcDir, path.join(staging, 'public', 'attachments', a.mount || ''))
+  }
+
+  // A diagram macro that resolved to nothing already renders a named placeholder;
+  // say so at build time too, so it is not left for a reader to find.
+  if (diagramWarnings.length) {
+    log(pc.yellow(`${diagramWarnings.length} diagram macro(s) did not resolve:`))
+    for (const w of diagramWarnings.slice(0, 25)) console.log(`  ${pc.dim(w)}`)
+    if (diagramWarnings.length > 25) console.log(`  … and ${diagramWarnings.length - 25} more`)
   }
 
   // Resolve/neutralize image references so a missing asset can't fail the build.
-  fixStagedImages(staging)
+  // On a portal, an attachment lives under its space's mount, so the page's mount
+  // decides where its `files/…` reference resolves.
+  fixStagedImages(
+    staging,
+    model.portal ? { langs: model.langs || [], mounts: Object.keys(model.spaceSlugs || {}) } : null
+  )
 
   // Carry a custom-domain CNAME into the published output.
   for (const c of ['CNAME', 'public/CNAME', '.gitbook/assets/CNAME']) {
@@ -375,7 +403,7 @@ async function prepare(projectRoot, overrides = {}) {
     )
   }
   const staging = stageContent(cfg, model, openapiSpecs)
-  if (cfg.source.format === 'termx' && cfg.txServer) {
+  if (cfg.source.format === 'owliki' && cfg.txServer) {
     log(`expanding {{csc}}/{{vsc}} from ${pc.dim(cfg.txServer)}`)
     await expandConceptMatrices(staging, cfg.txServer)
   }

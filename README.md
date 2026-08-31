@@ -33,7 +33,7 @@ Real sites built with mdbook — click a thumbnail for the live site (see
 - 🧵 **Orientation at scale** — breadcrumbs above every page, and a **Related** block cross-linking the same document id across parallel trees (a spec ↔ its validation ↔ the story it traces from)
 - 🌍 **Multilingual** — first-class locales (default language at `/`, others under `/<lang>/`)
 - 🧩 **TermX smart-text** — callouts, tabsets, links-list/grid-list, `+++` collapsibles, `page:`/`cs:`/`vs:`/`concept:` links, `files/` images, page icons, GitBook card tables
-- 📊 **Diagrams** — drawio, Mermaid, PlantUML
+- 📊 **Diagrams** — draw.io (including the wiki's versioned `{{drawio:name}}` macro, which always resolves to the newest saved version), Mermaid, and PlantUML (opt-in server, see `diagrams:`)
 - 💻 **Code** — Shiki highlighting for every fenced block; a fence that cites a source file (```` ```43:58:src/Foo.java ````) is highlighted by the file's extension and captioned with the path
 - 🌐 **OpenAPI** — render one or many OpenAPI 3.1 / 3.0 / Swagger 2.0 documents into searchable reference pages, from a whole document down to a single operation, with an optional try-it console authenticated via OpenID Connect (see [OpenAPI](#openapi))
 - 🔗 **Terminology** — `{{def:}}` StructureDefinition viewer, and `{{csc:}}`/`{{vsc:}}` concept tables fetched from a FHIR server at build time
@@ -44,8 +44,8 @@ Real sites built with mdbook — click a thumbnail for the live site (see
 - 🔐 **Authentication** — gate the site (or sections of it, or single pages) behind OpenID Connect (Keycloak), enforced server-side by `mdbook serve` (see [Authentication](#authentication))
 - 🗂️ **Multi-space portals** — compose several TermX wiki-ssg exports into one site, each space mounted under its own section with its own sidebar and access rules (see [Multi-space portals](#multi-space-portals))
 
-See [`docs/termx-wiki-compatibility.md`](docs/termx-wiki-compatibility.md) for the full
-TermX Wiki → mdbook feature matrix.
+See [`docs/owliki-compatibility.md`](docs/owliki-compatibility.md) for the full
+Owliki → mdbook feature matrix.
 
 
 ## Installation
@@ -231,10 +231,19 @@ comments:
   repoId: R_xxx
   category: Announcements
   categoryId: DIC_xxx
-  mapping: termx           # thread by the stable TermX page code (else: pathname, title, …)
+  mapping: owliki          # thread by the stable wiki page code (else: pathname, title, …)
 
 # TermX terminology (optional) — FHIR server for {{csc:}}/{{vsc:}} and cs:/vs: links.
-tx-server: https://your-termx-host/api/fhir
+tx-server: https://your-helextx-host/api/fhir
+
+# Diagrams (optional). Mermaid and draw.io need nothing configured. A ```plantuml
+# fence, however, is RENDERED BY A SERVER: the source is encoded into a URL and
+# every reader's browser fetches the picture from it. There is no default, so
+# without this setting a plantuml fence renders as a code block and neither the
+# build nor a reader contacts anyone. Set it to opt in — the public server, or
+# preferably your own.
+diagrams:
+  plantumlServer: https://www.plantuml.com/plantuml
 
 # Footer (optional) — shown on every page. Both fields allow inline HTML/links.
 footer:
@@ -271,7 +280,10 @@ build:
 | Format | Detected by | Layout |
 |---|---|---|
 | `gitbook` | `SUMMARY.md` | `README.md` (home) + `SUMMARY.md` (nav) + `.gitbook/assets` |
-| `termx` | `pages.json` (in `__source/`, `input/`, or `source/`) | `space.json` + `pages.json` + page markdown (+ `attachments/`) |
+| `owliki` | `pages.json` (in `__source/`, `input/`, or `source/`) | `space.json` + `pages.json` + page markdown (+ `attachments/`) |
+
+> `format: termx` is the former name of the `owliki` format and still works, so a site
+> published before the rename keeps building unchanged. New configs should say `owliki`.
 
 **Plain doc trees (no `SUMMARY.md`).** With the `gitbook` format, `SUMMARY.md` is optional:
 point mdbook at any folder of markdown and it builds a **per-section sidebar automatically**
@@ -307,7 +319,7 @@ and page directories are configurable:
 
 ```yaml
 source:
-  format: termx
+  format: owliki
   meta: source          # holds space.json + pages.json + attachments/  (default: __source)
   pages: source/pages   # page markdown, one file per slug
 ```
@@ -651,9 +663,14 @@ mdbook can render a [Giscus](https://giscus.app) comment box after each page, ba
      repoId: R_xxxxx
      category: Comments
      categoryId: DIC_xxxxx
-     mapping: termx      # thread by the stable TermX page code (survives renames);
+     mapping: owliki     # thread by the stable wiki page code (survives renames);
                          #   or use pathname / title / og:title
    ```
+
+   `mapping: termx` is the former name of `owliki` and still works. Both resolve to the
+   **same** discussion term, so switching a published site's config from one to the other
+   keeps every existing thread. The page code is also published as
+   `<meta name="owliki:page">` (and, for older readers, `<meta name="termx:page">`).
 
 Readers post with a one-time **“Sign in with GitHub”**; comments are stored as Discussions in the
 repo (moderate/reply there or inline), and the widget follows the site's light/dark theme. Omit the
@@ -687,8 +704,8 @@ Real repositories you can copy from — each links the live site and its `.mdboo
 
 | Project | Source | Live site | Repo |
 |---|---|---|---|
-| HL7 Lithuania Registry | `termx` (en/lt) | <https://hl7.lt> | [HL7LT/hl7lt-website](https://github.com/HL7LT/hl7lt-website/blob/main/.mdbook/config.yml) |
-| TermX tutorial | `termx` (en/lt) | <https://termx-health.github.io/tutorial/> | [termx-health/tutorial](https://github.com/termx-health/tutorial/blob/main/.mdbook/config.yml) |
+| HL7 Lithuania Registry | `owliki` (en/lt) | <https://hl7.lt> | [HL7LT/hl7lt-website](https://github.com/HL7LT/hl7lt-website/blob/main/.mdbook/config.yml) |
+| TermX tutorial | `owliki` (en/lt) | <https://termx-health.github.io/tutorial/> | [termx-health/tutorial](https://github.com/termx-health/tutorial/blob/main/.mdbook/config.yml) |
 | Portfolio | `gitbook` | <https://helex-solutions.github.io/ib-portfolio/> | [helex-solutions/ib-portfolio](https://github.com/helex-solutions/ib-portfolio/blob/main/.mdbook/config.yml) |
 
 Each config option, and a project that uses it:
@@ -696,7 +713,7 @@ Each config option, and a project that uses it:
 | Config | Example project(s) |
 |---|---|
 | `source.format: gitbook` (`SUMMARY.md` + `README.md` + `.gitbook/assets`) | portfolio |
-| `source.format: termx` + `meta` / `pages` (under `source/`) | hl7lt-website, tutorial |
+| `source.format: owliki` + `meta` / `pages` (under `source/`) | hl7lt-website, tutorial |
 | `site.url` (sitemap, canonical, Open Graph) | hl7lt-website |
 | `theme.skin` | hl7lt-website (`hl7lt`), tutorial (`helex`), portfolio (`default`) |
 | `search` | all three |

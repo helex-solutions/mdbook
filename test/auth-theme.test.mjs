@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { returnToFor } from '../src/auth/nav.mjs'
+import { giscusMapping } from '../src/theme/giscus.mjs'
 
 const at = (pathname, search = '') => ({ pathname, search })
 
@@ -34,4 +35,30 @@ test('auth links opt out of the SPA router', () => {
     const re = new RegExp(`\\{ \\.\\.\\.nav,[^}]*${cls}`)
     assert.match(src, re, `${cls} must spread nav so VitePress leaves the click alone`)
   }
+})
+
+// ---------------------------------------------------------------------------
+// Giscus threading. `owliki` and `termx` are the same instruction under two
+// names and MUST produce the same term: a site that updates its config would
+// otherwise lose every discussion it has.
+// ---------------------------------------------------------------------------
+
+test('giscusMapping: owliki and its former name termx thread by the same page code', () => {
+  const owliki = giscusMapping('owliki', 'p-42')
+  assert.deepEqual(owliki, { mapping: 'specific', term: 'p-42' })
+  assert.deepEqual(giscusMapping('termx', 'p-42'), owliki, 'the old spelling is not a new thread')
+})
+
+test('giscusMapping: no page code falls back to pathname, never an empty term', () => {
+  // `specific` with an empty term is a discussion nobody can find again.
+  for (const m of ['owliki', 'termx']) {
+    assert.deepEqual(giscusMapping(m, undefined), { mapping: 'pathname' })
+  }
+})
+
+test('giscusMapping: a real giscus mapping passes through untouched', () => {
+  for (const m of ['pathname', 'url', 'title', 'og:title']) {
+    assert.deepEqual(giscusMapping(m, 'p-42'), { mapping: m }, m)
+  }
+  assert.deepEqual(giscusMapping(undefined, 'p-42'), { mapping: 'pathname' }, 'unset default')
 })

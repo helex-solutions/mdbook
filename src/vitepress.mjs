@@ -1,6 +1,7 @@
 // Builds a VitePress user-config object from mdbook's normalized site bundle.
 // Called by the generated staging `.vitepress/config.mjs`.
 import { applyMarkdown } from './markdown/index.mjs'
+import { MDBOOK_ELEMENTS } from './ingest/sanitize.mjs'
 
 // `openapi.proxy` -> Vite dev-server proxy. Requests from the try-it console
 // then leave the browser same-origin and are forwarded by the dev server, so an
@@ -122,7 +123,7 @@ function seoHead(bundle) {
       tags.push(['meta', { property: 'og:description', content: description }])
       tags.push(['meta', { name: 'twitter:description', content: description }])
     }
-    // Authored keywords (from the TermX export) -> <meta name="keywords">.
+    // Authored keywords (from the Owliki export) -> <meta name="keywords">.
     const keywords = pd.frontmatter?.keywords
     const keywordsContent = Array.isArray(keywords) ? keywords.join(', ') : keywords
     if (keywordsContent) tags.push(['meta', { name: 'keywords', content: keywordsContent }])
@@ -134,9 +135,20 @@ function seoHead(bundle) {
       tags.push(['meta', { property: 'og:url', content: url }])
       tags.push(['link', { rel: 'canonical', href: url }])
     }
-    // Stable TermX identifiers (space + page code) for downstream tooling.
-    if (bundle.spaceCode) tags.push(['meta', { name: 'termx:space', content: bundle.spaceCode }])
-    if (pd.frontmatter?.termxPage) tags.push(['meta', { name: 'termx:page', content: pd.frontmatter.termxPage }])
+    // Stable wiki identifiers (space + page code) for downstream tooling, under
+    // BOTH names. `owliki:*` is the name to read; `termx:*` is what the same two
+    // identifiers were called before the rename and is still emitted, because a
+    // published meta tag is consumed by things this repo cannot see — and the
+    // one consumer it can see, Giscus threading, keys existing discussions off
+    // it. Additive costs two tags; dropping the old name orphans threads.
+    if (bundle.spaceCode) {
+      tags.push(['meta', { name: 'owliki:space', content: bundle.spaceCode }])
+      tags.push(['meta', { name: 'termx:space', content: bundle.spaceCode }])
+    }
+    if (pd.frontmatter?.termxPage) {
+      tags.push(['meta', { name: 'owliki:page', content: pd.frontmatter.termxPage }])
+      tags.push(['meta', { name: 'termx:page', content: pd.frontmatter.termxPage }])
+    }
     // JSON-LD structured data (WebSite on the home page, TechArticle elsewhere).
     const lang = pd.frontmatter?.lang || defaultLang || 'en'
     const ld = isHome
@@ -160,7 +172,7 @@ export function createMdbookConfig(bundle) {
   const { defaultLang, langs = [defaultLang], spaceNames = {} } = bundle
 
   const markdown = {
-    // TermX Wiki renders single newlines as <br> (markdown-it breaks:true).
+    // Owliki renders single newlines as <br> (markdown-it breaks:true).
     breaks: bundle.breaks ?? false,
     config: (md) =>
       applyMarkdown(md, {
@@ -174,7 +186,9 @@ export function createMdbookConfig(bundle) {
         spaceMounts: bundle.spaceMounts || null,
         spaceSlugs: bundle.spaceSlugs || null,
         langs: bundle.langs || [],
-        assetBase: bundle.assetBase || '/attachments'
+        assetBase: bundle.assetBase || '/attachments',
+        // Unset -> ```plantuml renders as a code block and nothing is fetched.
+        plantumlServer: bundle.plantumlServer || null
         // langPrefix is applied per-locale below via separate md instances is not
         // possible in VitePress (single md), so page: links resolve to root-relative;
         // acceptable because slugs are unique per space.
@@ -201,7 +215,7 @@ export function createMdbookConfig(bundle) {
     transformHead: seoHead(bundle),
     markdown,
     // <tx-sd-view> is the vendored StructureDefinition viewer web component.
-    vue: { template: { compilerOptions: { isCustomElement: (tag) => tag === 'tx-sd-view' } } },
+    vue: { template: { compilerOptions: { isCustomElement: (tag) => MDBOOK_ELEMENTS.has(tag) } } },
     // Don't watch mdbook's own source as config deps — editing the tool while a
     // project dev server runs would otherwise restart it (Shiki-dispose race).
     ...(bundle.mdbookDir

@@ -1,4 +1,4 @@
-// Fence languages TermX content uses that Shiki doesn't know, mapped to real
+// Fence languages Owliki content uses that Shiki doesn't know, mapped to real
 // language ids (an unknown fence language hard-fails the VitePress build).
 const FENCE_LANG_ALIAS = { s: 'sh' }
 
@@ -20,10 +20,20 @@ const HTML_TAGS = new Set(
   ).split(' ')
 )
 
+// Custom elements mdbook itself emits while staging — the vendored TermX
+// StructureDefinition viewer that `{{def:…}}` expands to. They are not HTML
+// element names, so without this the hardening pass below escapes the markup the
+// expansion just wrote and the macro renders as literal `&lt;tx-sd-view …`
+// instead of the element tree. `createMdbookConfig` declares the same names to
+// Vue's compiler (`isCustomElement`); this is that list, so the two cannot drift.
+export const MDBOOK_ELEMENTS = new Set(['tx-sd-view'])
+
 // Split markdown into code / non-code regions and run `fn` over the prose only,
 // leaving fenced blocks and inline code verbatim (their `<…>` and `{{…}}` are
 // already Vue-safe — fences are v-pre, inline code is escaped in the renderer).
-function mapProse(text, fn) {
+// Exported because every other staging transform that rewrites a `{{…}}` macro
+// owes code the same exemption: a fence documenting the macro must survive it.
+export function mapProse(text, fn) {
   const re = /```[\s\S]*?```|~~~[\s\S]*?~~~|``[\s\S]*?``|`[^`\n]*`/g
   let out = ''
   let last = 0
@@ -41,13 +51,14 @@ function mapProse(text, fn) {
 //      invalid tag. Autolinks (`<https://…>`, `<a@b.com>`), comments and
 //      declarations (`<!-- -->`, `<!DOCTYPE>`) are left alone.
 //   2. Mustache `{{ … }}` interpolation — escape the braces so Vue does not try
-//      to evaluate it. TermX embeds (`{{def:…}}`, `{{csc:…}}`, `{{vsc:…}}`) are
+//      to evaluate it. Owliki embeds (`{{def:…}}`, `{{csc:…}}`, `{{vsc:…}}`) are
 //      preserved so their markdown-it plugin still fires.
 function neutralizeProse(s) {
   s = s.replace(/<(\/?)([A-Za-z][A-Za-z0-9-]*)(.?)/g, (m, slash, name, next) => {
     // `<http://…>` / `<a@b.com>` are markdown autolinks, not tags — leave them.
     if (next === ':' || next === '@') return m
-    if (HTML_TAGS.has(name.toLowerCase())) return m
+    const tag = name.toLowerCase()
+    if (HTML_TAGS.has(tag) || MDBOOK_ELEMENTS.has(tag)) return m
     return `&lt;${slash}${name}${next}`
   })
   s = s.replace(/\{\{([\s\S]*?)\}\}/g, (m, inner) =>
@@ -65,9 +76,9 @@ export function hardenMarkdown(text) {
   return mapProse(text, neutralizeProse)
 }
 
-// Cleans up TermX / Wiki.js markdown artifacts that break VitePress's Vue
+// Cleans up Owliki / Wiki.js markdown artifacts that break VitePress's Vue
 // template compiler (which, unlike markdown-it, requires well-formed HTML).
-export function sanitizeTermxMarkdown(text) {
+export function sanitizeOwlikiMarkdown(text) {
   let out = text
 
   // Wiki.js inserts empty/standalone <span> tags to break auto-linking
@@ -82,7 +93,7 @@ export function sanitizeTermxMarkdown(text) {
   // during rendering, so dense tables render the same as in the wiki.
 
   // Normalize stray/aliased fence languages — an unknown language hard-fails the
-  // VitePress (Shiki) build, so map the ones TermX content uses to real ids.
+  // VitePress (Shiki) build, so map the ones Owliki content uses to real ids.
   out = out.replace(/^(\s*```)([A-Za-z0-9_+-]+)(\s*)$/gm, (m, open, lang, tail) =>
     FENCE_LANG_ALIAS[lang] ? `${open}${FENCE_LANG_ALIAS[lang]}${tail}` : m
   )

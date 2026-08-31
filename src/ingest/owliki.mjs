@@ -1,14 +1,16 @@
-// TermX Wiki export ingestion adapter.
+// Owliki export ingestion adapter.
 // Reads space.json + pages.json (the `wiki-ssg` export contract) and the page
 // markdown, producing the unified multilingual site model.
 //
 //   space.json : { web, code, names: { <lang>: <string> },
 //                  description?: { <lang>: <string> }, defaultLang?, langs?: [...], siteUrl? }
-//   pages.json : [ { code, tags?: [...], contents: [ { name, slug, lang, description? } ], children: [...] } ]
-// The description/defaultLang/langs/siteUrl, per-page description and page-level tags
-// are additive: when absent, mdbook falls back to inference (first-paragraph summary,
-// languages inferred from content, CI-detected URL) exactly as before. Page tags are
-// surfaced as <meta name="keywords">.
+//   pages.json : [ { code, pageId?, tags?: [...], contents: [ { name, slug, lang, description? } ], children: [...] } ]
+// The description/defaultLang/langs/siteUrl, per-page description, page-level tags and
+// pageId are additive: when absent, mdbook falls back to inference (first-paragraph
+// summary, languages inferred from content, CI-detected URL) exactly as before. Page
+// tags are surfaced as <meta name="keywords">; `pageId` is the page's own
+// `attachments/<pageId>/` folder, which is what `{{drawio:name}}` resolves against
+// (src/ingest/drawio.mjs infers it when the export does not say).
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -102,14 +104,19 @@ function ingestSpaceModel(cfg) {
             src, dest, lang, title: content.name?.trim() || content.slug, code: node.code,
             description: content.description || null,
             tags: node.tags?.length ? node.tags : null, // page-level; -> <meta keywords>
-            access: access || null // page/inherited access -> acl.json
+            access: access || null, // page/inherited access -> acl.json
+            // Optional (wiki-ssg contract extension): the wiki page id, which is
+            // the `attachments/<pageId>/` folder this page's files live in. The
+            // only exact answer for `{{drawio:}}`, which names no folder itself
+            // (src/ingest/drawio.mjs). Absent -> resolved by inference, as ever.
+            attachments: node.pageId ?? node.attachments ?? null
           })
           pageCount[lang] = (pageCount[lang] || 0) + 1
         }
         const entry = { text: content.name?.trim() || content.slug, link: linkFor(content.slug, lang) }
         if (children.length) {
           entry.items = children
-          entry.collapsed = true // collapsible + collapsed, like the TermX SSG menu
+          entry.collapsed = true // collapsible + collapsed, like the reference SSG menu
         }
         items.push(entry)
       } else if (children.length) {
@@ -147,7 +154,8 @@ function ingestSpaceModel(cfg) {
         contentFiles.push({
           src, dest, lang, title: first.name?.trim() || first.slug, code: node.code,
           description: first.description || null,
-          tags: node.tags?.length ? node.tags : null // page-level; -> <meta keywords>
+          tags: node.tags?.length ? node.tags : null, // page-level; -> <meta keywords>
+          attachments: node.pageId ?? node.attachments ?? null
         })
         home[lang] = dest
       }
@@ -192,7 +200,7 @@ function ingestSpaceModel(cfg) {
     navs,
     spaceNames,
     contentFiles: contentFiles.filter((f) => activeLangs.includes(f.lang)),
-    assets: [] // TermX attachments (files/<id>/…) are rewritten by the markdown plugin
+    assets: [] // Owliki attachments (files/<id>/…) are rewritten by the markdown plugin
   }
 }
 
@@ -200,14 +208,14 @@ function ingestSpaceModel(cfg) {
 //
 // Multi-space portal (OWLEXICON.01 §4.5): one site, many wiki-ssg exports.
 //   source:
-//     format: termx
+//     format: owliki
 //     spaces:
 //       handbook: docs/handbook    # dir with space.json / pages.json / pages/…
 //       api: docs/api
 // Each space mounts under /<key>/ (its own sidebar; every locale under
 // /<lang>/<key>/), the nav gets one entry per space, and a portal home page
 // linking the spaces is generated per locale. Attachments are namespaced per
-// mount so page ids from different TermX instances cannot collide.
+// mount so page ids from different Owliki instances cannot collide.
 
 const MOUNT_RE = /^[A-Za-z0-9][\w-]*$/
 
@@ -352,7 +360,7 @@ function ingestPortal(cfg) {
   }
 }
 
-export function ingestTermx(cfg) {
+export function ingestOwliki(cfg) {
   const spaces = cfg.source.spaces
   if (spaces && Object.keys(spaces).length) return ingestPortal(cfg)
   return ingestSpaceModel(cfg)
