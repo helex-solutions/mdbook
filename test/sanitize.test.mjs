@@ -22,12 +22,12 @@ test('hardenMarkdown: keeps real HTML elements intact', () => {
   assert.match(out, /<a id="anchor">/, '<a> is kept')
 })
 
-test('hardenMarkdown: neutralizes Vue {{ }} interpolation but preserves TermX embeds', () => {
+test('hardenMarkdown: neutralizes Vue {{ }} interpolation but preserves Owliki embeds', () => {
   const out = hardenMarkdown('Title with {{version}} and {{ name }}.\n\nSee {{def:my-sd}} and {{csc:x}}.')
   assert.doesNotMatch(out, /\{\{version\}\}/, 'generic interpolation is defused')
   assert.doesNotMatch(out, /\{\{ name \}\}/, 'spaced interpolation is defused')
-  assert.match(out, /\{\{def:my-sd\}\}/, 'TermX {{def:}} embed is preserved')
-  assert.match(out, /\{\{csc:x\}\}/, 'TermX {{csc:}} embed is preserved')
+  assert.match(out, /\{\{def:my-sd\}\}/, 'Owliki {{def:}} embed is preserved')
+  assert.match(out, /\{\{csc:x\}\}/, 'Owliki {{csc:}} embed is preserved')
 })
 
 test('hardenMarkdown: leaves fenced code and autolinks alone', () => {
@@ -42,4 +42,12 @@ test('hardenMarkdown: does not touch frontmatter', () => {
   const out = hardenMarkdown('---\ntitle: "A {{x}} <Thing>"\n---\n\nBody <Thing> and {{x}}.')
   assert.match(out, /title: "A \{\{x\}\} <Thing>"/, 'frontmatter is preserved verbatim')
   assert.match(out, /&lt;Thing> and &#123;&#123;x&#125;&#125;/, 'body is still hardened')
+})
+
+test('hardenMarkdown: keeps the custom elements mdbook itself expands macros into', () => {
+  // `{{def:…}}` expands to <tx-sd-view> BEFORE hardening runs; escaping it here
+  // would leave the macro rendering as literal markup instead of an element tree.
+  const out = hardenMarkdown('<div class="mdbook-sd"><tx-sd-view data="%7B%7D" mode="diff"></tx-sd-view></div>')
+  assert.match(out, /<tx-sd-view data="%7B%7D" mode="diff">/, 'the opening tag survives')
+  assert.match(out, /<\/tx-sd-view>/, 'and so does the closing tag')
 })

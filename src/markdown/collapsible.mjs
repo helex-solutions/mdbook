@@ -1,4 +1,4 @@
-// TermX / Wiki.js "insert" collapsible blocks:
+// Owliki / Wiki.js "insert" collapsible blocks:
 //
 //   +++ Summary text
 //   ...markdown body...

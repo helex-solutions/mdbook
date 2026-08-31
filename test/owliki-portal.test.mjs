@@ -5,8 +5,8 @@ import os from 'node:os'
 import path from 'node:path'
 import MarkdownIt from 'markdown-it'
 import { loadConfig } from '../src/config.mjs'
-import { ingestTermx } from '../src/ingest/termx.mjs'
-import { termxLinks, termxImages, mountFromPath } from '../src/markdown/index.mjs'
+import { ingestOwliki } from '../src/ingest/owliki.mjs'
+import { owlikiLinks, owlikiImages, mountFromPath } from '../src/markdown/index.mjs'
 
 // Two wiki-ssg exports composed into one portal.
 function portalProject() {
@@ -48,8 +48,8 @@ function portalProject() {
 
 test('portal ingest: mounts, sidebars, navs, home, langs', () => {
   const cfg = loadConfig(portalProject())
-  assert.equal(cfg.source.format, 'termx') // spaces implies termx
-  const model = ingestTermx(cfg)
+  assert.equal(cfg.source.format, 'owliki') // spaces implies owliki
+  const model = ingestOwliki(cfg)
 
   assert.equal(model.portal, true)
   assert.deepEqual(model.langs, ['en', 'de'])
@@ -120,8 +120,8 @@ test('portal markdown: page links and images resolve within the page mount', () 
     spaceMounts: { 'handbook-space': 'handbook', 'api-space': 'api' }
   }
   const md = new MarkdownIt({ html: true })
-  md.use(termxLinks, opts)
-  md.use(termxImages, opts)
+  md.use(owlikiLinks, opts)
+  md.use(owlikiImages, opts)
   const render = (src, relativePath) => md.render(src, { relativePath })
 
   // Same-space link resolves under the page's own mount.

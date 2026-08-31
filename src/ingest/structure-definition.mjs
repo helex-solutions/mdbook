@@ -1,6 +1,6 @@
 // Expands standalone `{{def:code; params}}` includes into the TermX
 // StructureDefinition viewer web component, using the exported FHIR JSON
-// (termx-server writes it to __source/resources/structure-definition/<code>.json).
+// (the wiki export writes it to __source/resources/structure-definition/<code>.json).
 //
 //   {{def:EduPatient}}            -> <tx-sd-view data=… mode="diff">
 //   {{def:tobacco-use; type=diff}}

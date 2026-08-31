@@ -1,4 +1,4 @@
-// Rewrites TermX Wiki link schemes to real URLs.
+// Rewrites Owliki link schemes to real URLs.
 //   page:<slug>            -> internal /<slug>            (clean URL, locale-aware)
 //   page:<space>/<slug>    -> internal /<slug>
 //   cs:<code>              -> <web>/resources/code-systems/<code>/summary
@@ -7,7 +7,7 @@
 //   ms:<code> / msv:…      -> …/map-sets/…
 //   concept:<cs>|<code>    -> …/code-systems/<cs>/concepts/<code>/view
 //
-// `web` (from space.json) is the TermX instance base for terminology links.
+// `web` (from space.json) is the wiki instance base for terminology links.
 // `langPrefix` prefixes internal page links for non-default locales.
 const RESOURCE = {
   cs: (v) => `resources/code-systems/${v}/summary`,
@@ -31,7 +31,7 @@ export function mountFromPath(relativePath, { langs = [], mounts = [] } = {}) {
   return mounts.includes(first) ? first : null
 }
 
-export function termxLinks(md, opts = {}) {
+export function owlikiLinks(md, opts = {}) {
   const web = (opts.web || '').replace(/\/$/, '')
   const txServer = (opts.txServer || '').replace(/\/$/, '')
   const langPrefix = opts.langPrefix ? `/${opts.langPrefix}` : ''
@@ -85,7 +85,7 @@ function resolve(href, ctx) {
       return web ? `${web}/wiki/${space}/${slug}` : `${langPrefix}/${slug}`.replace(/\/+/g, '/')
     }
     // Same-space: internal link when the page exists in this build; otherwise
-    // fall back to the page on the TermX web wiki.
+    // fall back to the page in the live wiki.
     if (portal && mount) {
       if (portal.slugs[mount]?.has(value)) return `/${mount}/${value}`
       if (web && spaceCode) return `${web}/wiki/${spaceCode}/${value}`
@@ -96,7 +96,7 @@ function resolve(href, ctx) {
     return `${langPrefix}/${value}`.replace(/\/+/g, '/')
   }
 
-  // Prefer the TermX web UI (nice pages); fall back to FHIR resource URLs on
+  // Prefer the Helex TX web UI (nice pages); fall back to FHIR resource URLs on
   // txServer when no web UI base is configured.
   if (scheme === 'concept') {
     const [cs, code] = value.split('|')

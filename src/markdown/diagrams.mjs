@@ -1,10 +1,9 @@
-// Renders TermX diagram fences, mirroring the termx-web wiki plugins:
+// Renders Owliki diagram fences, mirroring the wiki's own renderer
+// (helex-tx `modules/owliki/frontend/src/components/markdown.ts`):
 //   ```drawio    <base64-svg>       -> inline <img> from a data: URI
-//   ```plantuml  <uml source>       -> <img> from the PlantUML server
+//   ```plantuml  <uml source>       -> <img> from the configured PlantUML server
 //   ```mermaid   <mermaid source>   -> <div> rendered client-side by mermaid
 import plantumlEncoder from 'plantuml-encoder'
-
-const PLANTUML_SERVER = 'https://www.plantuml.com/plantuml/svg'
 
 // Register a block rule that captures a ```<lang> … ``` fence and emits a
 // custom token. `render(content)` returns the HTML string for that token.
@@ -44,7 +43,9 @@ function fencedBlock(md, lang, type, render) {
 
 export function diagrams(md, opts = {}) {
   const esc = md.utils.escapeHtml
-  const plantumlServer = opts.plantumlServer || PLANTUML_SERVER
+  // No default: an unset server means the fence renders as a code block (below).
+  // A trailing `/svg` is tolerated — that is how the endpoint is usually quoted.
+  const plantumlServer = (opts.plantumlServer || '').replace(/\/+$/, '').replace(/\/svg$/, '') || null
 
   // drawio: the fence body is base64-encoded SVG.
   fencedBlock(md, 'drawio', 'drawio', (content) => {
@@ -52,15 +53,31 @@ export function diagrams(md, opts = {}) {
     return `<div class="mdbook-drawio"><img class="drawio" src="data:image/svg+xml;base64,${b64}" alt="diagram"></div>`
   })
 
-  // plantuml: encode the source for the PlantUML server.
+  // plantuml: rendering means sending the fence — untrusted page content — to a
+  // PlantUML server, and every reader's browser fetching the picture back from
+  // it. So the server is CONFIGURED or there is none: with none, the fence is a
+  // code block and the build makes no third-party reference at all. Same rule as
+  // the wiki's own renderer, which reads it from `PLANTUML_URL`.
+  //
+  // The fence is consumed either way rather than left to markdown-it: `plantuml`
+  // is not a language Shiki knows, and an unknown fence language hard-fails the
+  // VitePress build.
   fencedBlock(md, 'plantuml', 'plantuml', (content) => {
+    const plain = () =>
+      `<div class="mdbook-plantuml-source"><pre v-pre><code>${esc(content)}</code></pre></div>`
+    if (!plantumlServer) return plain()
+    // The wiki's reference renderer wraps the source in @startuml/@enduml, so
+    // content written for it carries neither marker. Add them only when absent —
+    // an explicit @startgantt/@startmindmap still works.
+    const body = /^\s*@start/.test(content) ? content : `@startuml\n${content}\n@enduml`
     let encoded
     try {
-      encoded = plantumlEncoder.encode(content)
+      encoded = plantumlEncoder.encode(body)
     } catch {
-      return `<pre>${esc(content)}</pre>`
+      return plain()
     }
-    return `<div class="mdbook-plantuml"><img class="plantuml" src="${plantumlServer}/${encoded}" alt="PlantUML diagram" loading="lazy"></div>`
+    const src = `${plantumlServer}/svg/${encoded}`
+    return `<div class="mdbook-plantuml"><img class="plantuml" src="${esc(src)}" alt="PlantUML diagram" loading="lazy"></div>`
   })
 
   // mermaid: rendered client-side; source carried url-encoded to stay Vue-safe.

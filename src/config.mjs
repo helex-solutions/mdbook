@@ -18,10 +18,22 @@ function readConfigFile(mdbookDir) {
   return { data: {}, file: null }
 }
 
-// Defaults per source format. GitBook and TermX exports have different layouts.
+// Defaults per source format. GitBook and Owliki exports have different layouts.
 const SOURCE_DEFAULTS = {
   gitbook: { root: '.', summary: 'SUMMARY.md', home: 'README.md', assets: '.gitbook/assets' },
-  termx: { meta: '__source', pages: 'input', assets: 'files' }
+  owliki: { meta: '__source', pages: 'input', assets: 'files' }
+}
+
+// `format: termx` was this format's name before the wiki was called Owliki, and
+// it is written into the config of every site already published with mdbook. It
+// keeps working: a format name is a contract with those repositories, and
+// renaming one without an alias turns the next release into "Unknown source
+// format" for all of them. `owliki` is the name to write in new configs.
+const FORMAT_ALIASES = { termx: 'owliki' }
+
+function normalizeFormat(format) {
+  const f = String(format).toLowerCase()
+  return FORMAT_ALIASES[f] || f
 }
 
 export function loadConfig(projectRoot, overrides = {}) {
@@ -29,9 +41,9 @@ export function loadConfig(projectRoot, overrides = {}) {
   const mdbookDir = path.join(projectRoot, '.mdbook')
   const { data, file } = readConfigFile(mdbookDir)
 
-  const format = (
-    data.source?.format || (data.source?.spaces ? 'termx' : detectFormat(projectRoot)) || 'gitbook'
-  ).toLowerCase()
+  const format = normalizeFormat(
+    data.source?.format || (data.source?.spaces ? 'owliki' : detectFormat(projectRoot)) || 'gitbook'
+  )
   const sourceDefaults = SOURCE_DEFAULTS[format] || {}
 
   const siteBase = resolveBase({ explicit: overrides.base ?? data.site?.base, projectRoot })
@@ -54,9 +66,11 @@ export function loadConfig(projectRoot, overrides = {}) {
       url: resolveSiteUrl({ explicit: data.site?.url, projectRoot, base: siteBase })
     },
     source: {
-      format,
       ...sourceDefaults,
-      ...(data.source || {})
+      ...(data.source || {}),
+      // Resolved last so it wins over the spread: `data.source.format` is the raw
+      // spelling, and an alias (`termx`) has to survive to the normalized name.
+      format
     },
     // FHIR terminology server base (…/fhir) for expanding {{csc:}}/{{vsc:}} at
     // build time and for cs:/vs: links. Accepts `txServer` or `tx-server`.
@@ -77,6 +91,14 @@ export function loadConfig(projectRoot, overrides = {}) {
     search: typeof data.search === 'object' && data.search ? (data.search.enabled ?? true) : (data.search ?? true),
     searchExclude:
       (typeof data.search === 'object' && data.search && data.search.exclude) || [],
+    // Diagram rendering. `plantumlServer` is the PlantUML endpoint (e.g.
+    // https://www.plantuml.com/plantuml, or a self-hosted one) — UNSET by
+    // default, because rendering sends the fence's source to that server and
+    // points every reader's browser at it. With none set, a ```plantuml fence
+    // renders as a code block. Mermaid and draw.io need no server.
+    diagrams: {
+      plantumlServer: data.diagrams?.plantumlServer || data.diagrams?.plantuml || null
+    },
     openapi: normalizeOpenapi(data.openapi, projectRoot),
     // Site authentication (see docs/auth-design.md): OIDC gate + access rules,
     // resolved at build into acl.json and enforced by `mdbook serve`.
@@ -122,6 +144,10 @@ export function applySpaceConfig(cfg, model) {
   if (ssg.footer && !cfg.footer) cfg.footer = ssg.footer
   if (ssg.search != null && raw.search == null) cfg.search = ssg.search
   if (ssg.logo && !cfg.site.logo) cfg.site.logo = ssg.logo
+  // The wiki knows its own PlantUML endpoint; a space can export it so a
+  // published repo renders the fences its pages render. The repo's config wins.
+  const ssgPlantuml = ssg.diagrams?.plantumlServer || ssg.plantumlServer
+  if (ssgPlantuml && raw.diagrams?.plantumlServer == null) cfg.diagrams.plantumlServer = ssgPlantuml
   // wiki-ssg contract extension: the space may export access defaults
   // (`ssg.auth: { access, rules }`). The repo's own auth block wins.
   if (ssg.auth && raw.auth == null) cfg.auth = normalizeAuth(ssg.auth)
@@ -211,8 +237,8 @@ function normalizeOpenapi(data, projectRoot) {
 }
 
 function detectFormat(projectRoot) {
-  if (fs.existsSync(path.join(projectRoot, '__source', 'pages.json'))) return 'termx'
-  if (fs.existsSync(path.join(projectRoot, 'input', 'pages.json'))) return 'termx'
+  if (fs.existsSync(path.join(projectRoot, '__source', 'pages.json'))) return 'owliki'
+  if (fs.existsSync(path.join(projectRoot, 'input', 'pages.json'))) return 'owliki'
   if (fs.existsSync(path.join(projectRoot, 'SUMMARY.md'))) return 'gitbook'
   return null
 }

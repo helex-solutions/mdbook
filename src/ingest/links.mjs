@@ -9,7 +9,7 @@ import { walkMarkdown } from './util.mjs'
 // [text](href) but NOT ![alt](src) — images are handled by fixStagedImages.
 const LINK_RE = /(?<!!)\[[^\]]*\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)/g
 const EXTERNAL = /^(https?:|mailto:|tel:|data:|#|\/\/)/i
-// TermX/web link namespaces resolved elsewhere (they point at the web UI).
+// Wiki/web link namespaces resolved elsewhere (they point at the web UI).
 const NAMESPACE = /^(cs|vs|ms|concept|def|csc|vsc):/i
 
 function routeOf(dest) {

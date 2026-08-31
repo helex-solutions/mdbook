@@ -1,17 +1,17 @@
-// Rewrites TermX attachment image references.
+// Rewrites Owliki attachment image references.
 //   ![alt](files/<folder>/<file>)  ->  <assetBase>/<folder>/<file>
-// Attachments are exported by termx-server to `attachments/<pageId>/<file>`;
+// Attachments are published to `attachments/<pageId>/<file>` by the wiki;
 // mdbook stages them under a public assets dir. `<folder>` is usually the
 // numeric page id, but any name is accepted (e.g. files/wiki/x.png).
 // `assetBase` defaults to `/attachments` (served from the site root).
 // On a portal build attachments are namespaced per mount
-// (attachments/<mount>/<pageId>/…) so page ids from different TermX instances
+// (attachments/<mount>/<pageId>/…) so page ids from different Owliki instances
 // cannot collide; the page's own mount comes from env.relativePath.
-import { mountFromPath } from './termx-links.mjs'
+import { mountFromPath } from './owliki-links.mjs'
 
 const FILE_RE = /^files\/([\w.-]+)\/(.+)$/
 
-export function termxImages(md, opts = {}) {
+export function owlikiImages(md, opts = {}) {
   const assetBase = (opts.assetBase || '/attachments').replace(/\/$/, '')
   const portal = opts.portal
     ? { langs: opts.langs || [], mounts: Object.keys(opts.spaceSlugs || {}) }

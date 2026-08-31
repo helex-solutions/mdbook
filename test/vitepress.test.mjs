@@ -27,7 +27,7 @@ test('createMdbookConfig: sitemap + transformHead gated on siteUrl', () => {
   assert.equal(noUrl.sitemap, undefined)
 })
 
-test('seoHead: content page emits og/canonical/termx/JSON-LD', () => {
+test('seoHead: content page emits og/canonical/wiki-ids/JSON-LD', () => {
   const cfg = createMdbookConfig({
     title: 'Site', description: 'sd', siteUrl: 'https://x.io/b/', cleanUrls: true,
     langs: ['en'], defaultLang: 'en', spaceCode: 'space1'
@@ -37,6 +37,11 @@ test('seoHead: content page emits og/canonical/termx/JSON-LD', () => {
   })
   assert.ok(find(tags, (t) => t[1].property === 'og:title' && t[1].content === 'Foo'))
   assert.ok(find(tags, (t) => t[0] === 'link' && t[1].rel === 'canonical' && t[1].href === 'https://x.io/b/foo'))
+  // Both names, deliberately: `owliki:*` is what to read, `termx:*` is kept
+  // because published meta tags have readers this repo cannot see — and Giscus
+  // threads existing discussions off the old one.
+  assert.ok(find(tags, (t) => t[1].name === 'owliki:page' && t[1].content === 'p-1'))
+  assert.ok(find(tags, (t) => t[1].name === 'owliki:space' && t[1].content === 'space1'))
   assert.ok(find(tags, (t) => t[1].name === 'termx:page' && t[1].content === 'p-1'))
   assert.ok(find(tags, (t) => t[1].name === 'termx:space' && t[1].content === 'space1'))
   const ld = JSON.parse(find(tags, (t) => t[0] === 'script' && t[1].type === 'application/ld+json')[2])

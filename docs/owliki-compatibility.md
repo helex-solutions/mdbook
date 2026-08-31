@@ -1,10 +1,11 @@
-# TermX Wiki → mdbook: differences reference
+# Owliki → mdbook: differences reference
 
-Reference for migrating **TermX Wiki** content (the `markdown-it` renderer in
-`@termx-health/markdown-parser` / termx-web) to **mdbook**. Use it when planning the
-TermX web docs migration.
+Reference for publishing **Owliki** wiki content as a static site with **mdbook**. It
+covers the reference wiki Owliki succeeds too (the `markdown-it` renderer in
+`@termx-health/markdown-parser`), because both write the same dialect — that
+is the point of it. Use it when planning a wiki-to-site migration.
 
-mdbook is built on **VitePress**, which uses the same `markdown-it` engine as TermX Wiki,
+mdbook is built on **VitePress**, which uses the same `markdown-it` engine as the wiki,
 so most syntax is reproduced natively. Where they differ it's almost always because a
 static site can't do what a live app does (query a terminology server on the fly, run the
 editor) or because VitePress renders Markdown output as a **Vue template** (stricter than
@@ -16,7 +17,7 @@ Legend: ✅ full parity · 🟡 works with a caveat · 🔴 not supported static
 
 ## 1. Standard markdown-it extensions
 
-| Feature | Syntax | TermX plugin | mdbook | Notes |
+| Feature | Syntax | Wiki plugin | mdbook | Notes |
 |---|---|---|---|---|
 | Attribute lists | `{.class #id key=val}` | markdown-it-attrs | ✅ | Same plugin |
 | Emoji | `:smile:` | markdown-it-emoji | ✅ | VitePress built-in |
@@ -26,11 +27,11 @@ Legend: ✅ full parity · 🟡 works with a caveat · 🔴 not supported static
 | Footnotes | `[^1]` | markdown-it-footnote | ✅ | |
 | Collapsible | `+++ Title … +++` | markdown-it-collapsible | ✅ | `<details>` |
 | Multi-column tables | `^^` rowspan · `\|\|\|` colspan · multiline · headerless | markdown-it-multimd-table | ✅ | Same options (`multiline`, `rowspan`, `headerless`) |
-| Line breaks | single newline → `<br>` | `breaks: true` | ✅ | Enabled for the `termx` source format |
+| Line breaks | single newline → `<br>` | `breaks: true` | ✅ | Enabled for the `owliki` source format |
 | Linkify / typographer / raw HTML | — | core options | ✅ | |
 | Abbreviations | `*[HTML]: HyperText…` | markdown-it-abbr | 🟡 | Not enabled (unused in the tutorial); one-line add if a space needs it |
 
-## 2. TermX "smart text"
+## 2. Owliki "smart text"
 
 | Feature | Syntax | mdbook | Notes |
 |---|---|---|---|
@@ -43,13 +44,66 @@ Legend: ✅ full parity · 🟡 works with a caveat · 🔴 not supported static
 | Link schemes | `[t](cs\|csv\|vs\|vsv\|ms\|msv\|concept\|page\|namespace:…)` | ✅ | See §5 for how each resolves |
 | Attachment images | `![](files/<pageId>/<file>)` | ✅ | Rewritten to `/attachments/<pageId>/<file>`, served from the exported `attachments/`; missing local images are dropped so the build never fails |
 | Draw.io | ` ```drawio ` (base64 SVG) | ✅ | Inline `data:` URI `<img>` |
-| Mermaid | ` ```mermaid ` | ✅ | Rendered client-side (mermaid), theme-aware |
-| PlantUML | ` ```plantuml ` | ✅ | Encoded (`plantuml-encoder`) to the PlantUML server — needs internet at view time |
+| Draw.io, versioned | `{{drawio:name}}` | ✅ | Resolved at build time to the **highest** `name.vN.drawio.png` in the page's attachments, emitted as an ordinary `files/…` embed. See §2.1 |
+| Mermaid | ` ```mermaid ` | ✅ | Rendered client-side, theme-aware, with `securityLevel: 'strict'` and root-level `htmlLabels: false` — the same two settings the wiki states |
+| PlantUML | ` ```plantuml ` | ✅ | Encoded (`plantuml-encoder`) to the server set in `diagrams.plantumlServer`; `@startuml`/`@enduml` added when the source has no `@start` marker. **No default** — with none configured the fence renders as a code block and nothing is fetched |
 | GitBook card tables | `<table data-view="cards">` | ✅ | Converted to a card grid (also cover-image and linked-title variants) — for GitBook-sourced spaces |
 | Card grid with buttons | list + `{.card-grid}` | ✅ | Markdown-authored card grid: per-item image (cover), heading (title), text (description) and `{.button}` links (rendered as `a.mdbook-card-btn`; `.secondary` = outlined). `{.card-grid .cards-row}` for a horizontal layout. See `src/markdown/card-grid.mjs` |
-| Include: StructureDefinition | `{{def:code; type=diff\|snap\|hybrid}}` | ✅ | Rendered by the vendored `@termx-health/structure-definition-viewer` from the exported `__source/resources/structure-definition/<code>.json` |
+| Include: StructureDefinition | `{{def:code; type=diff\|snap\|hybrid}}` | ✅ | The full element tree — cardinality, flags, types, bindings, diff/hybrid/snapshot — rendered by the vendored `@termx-health/structure-definition-viewer` from the exported `<meta>/resources/structure-definition/<code>.json`. Falls back to an include card when that file is absent, which is what an Owliki-published repo currently gets: see §2.2 |
 | Include: CodeSystem concepts | `{{csc:code\|ver; properties=…; langs=…; limit=…}}` | ✅ | Fetched at build time from the FHIR server: `GET {tx-server}/CodeSystem/{code}` → inline `concept[]`. Card fallback if `tx-server` is unset or the fetch fails |
 | Include: ValueSet concepts | `{{vsc:code\|ver; …}}` | ✅ | Fetched at build time: `GET {tx-server}/ValueSet/{code}/$expand?includeDesignations=true` → `expansion.contains[]`. Same fallback |
+
+### 2.1 `{{drawio:name}}` — which file the macro means
+
+A diagram is a page attachment in draw.io's `xmlpng` format, and attachments are
+immutable by name, so every save writes a new version: `architecture.v1.drawio.png`,
+`architecture.v2.drawio.png`, `architecture.v10.drawio.png`. The macro names the
+**diagram**, and always resolves to the highest version **by parsed number** — never
+by filename order (`v10` beats `v2`), listing order, or upload time. A file with no
+`.vN.` segment is not one of these: pre-macro diagrams are plain
+`![](files/12/diagram-1.drawio.png)` embeds and keep rendering as ordinary images.
+
+The wiki resolves the same macro at read time, from the live attachment list, in
+helex-tx `modules/owliki/frontend/src/components/diagramLinks.ts`. Two implementations
+of one rule drift silently and the failure mode is a published page showing an older
+diagram than the wiki, so `src/ingest/diagram-files.mjs` is a deliberate transcription
+of that file and `test/drawio.test.mjs` mirrors its cases. **Change one, change both.**
+
+**Which page's attachments.** Attachments publish to `attachments/<pageId>/<name>`
+(OWLIKI.07 §3.4), but the macro names no page and `pages.json` publishes no page id.
+mdbook recovers the folder in descending order of certainty:
+
+1. `pages.json` node `pageId` — exact, and the only exact answer. Additive to the
+   wiki-ssg contract, like `tags` and `access`; absent today (see below).
+2. A folder the page already embeds from through `files/<folder>/…`.
+3. The whole export, when exactly one folder holds a diagram of that name.
+
+When several folders hold the name and nothing narrows them, the macro renders a
+named placeholder and the build warns — it never picks one. Diagram names collide
+by construction: the wiki's editor names new diagrams `diagram`, `diagram-2`, … per
+page, so a guess would show another page's picture, silently.
+
+> **Publisher follow-up.** `WikiMdbookDataHandler.pagesJson` (helex-tx) should emit
+> `"pageId": <id>` per node — one line, and it makes rule 1 the normal path instead
+> of the exception. Until it does, a published page whose only attachment is a
+> default-named diagram cannot be resolved.
+
+### 2.2 `{{def:}}` on an Owliki-published repo
+
+The static half is real and complete: given the StructureDefinition JSON, the
+vendored viewer draws the same element tree the wiki's `FhirStructureDefinitionViewer`
+draws. It reads that JSON from `<source.meta>/resources/structure-definition/<code>.json`,
+which is what a `wiki-ssg` export writes.
+
+`WikiMdbookDataHandler` does not write it — it publishes `space.json`, `pages.json`,
+`pages/` and `attachments/` only — so on an Owliki-published repo a `{{def:}}` macro
+degrades to the include card. There is nothing the generator can do about that: a
+static site has no API to call, and the resource has to be *in* the repository.
+
+> **Publisher follow-up.** The handler should emit
+> `resources/structure-definition/<code>.json` for every definition its pages cite,
+> from the same compiled resource `GET /structure-definitions/{id}/fhir` returns.
+> The generator already reads exactly that path; no change is needed here.
 
 ## 3. Editor-only features (not applicable to a static site)
 
@@ -61,7 +115,7 @@ Legend: ✅ full parity · 🟡 works with a caveat · 🔴 not supported static
 
 ## 4. Rendering-engine differences (VitePress/Vue)
 
-TermX renders markdown-it's HTML directly; VitePress compiles it as a **Vue template**,
+The wiki renders markdown-it's HTML directly; VitePress compiles it as a **Vue template**,
 which is stricter. mdbook normalizes content at build time so these never break:
 
 | Issue | Cause | Handling |
@@ -74,26 +128,26 @@ which is stricter. mdbook normalizes content at build time so these never break:
 
 ## 5. Structural / routing differences
 
-- **Multilingual routes.** TermX SSG uses `/en/…`, `/lt/…`. mdbook serves the **default
+- **Multilingual routes.** The reference SSG uses `/en/…`, `/lt/…`. mdbook serves the **default
   language at the root** (`/…`) and other locales under `/<lang>/…` (VitePress i18n).
   A page appears in a locale only if it is actually translated in that language. For
   **gitbook** sources, additional locales are authored as `<lang>/` subdirectories, each with
   its own `SUMMARY.md` + `README.md` + pages.
 - **Locale-switch redirects.** VitePress's language switcher swaps only the locale prefix
   (keeping the current slug). When a page's slug differs per language (e.g. `/build` vs
-  `/lt/versijos`, common in TermX where each language has its own slug), the swapped path
+  `/lt/versijos`, common in the wiki, where each language has its own slug), the swapped path
   (`/lt/build`) would 404. mdbook emits a small **redirect stub** at that path — derived from
   the per-code slug mapping in `pages.json` — that bounces to the real translation, so the
-  switcher always lands on the correct page (`src/ingest/termx.mjs` + the `redirect`
+  switcher always lands on the correct page (`src/ingest/owliki.mjs` + the `redirect`
   front-matter handled in `src/theme/index.mjs`).
 - **Menu.** Built from `pages.json`; groups are collapsible/collapsed like the SSG. Config
   can add nav/sidebar entries or fully override the sidebar. On multilingual sites the shared
   `nav`/`sidebarExtra` links are localized per locale (`/build` → `/lt/build`); a `locales:`
   block can override a locale's menu labels/links and its switcher label.
 - **Page links.** `page:slug` → the internal page when it exists in this build; otherwise
-  (and for cross-space `page:space/slug`) → the page on the TermX web wiki
+  (and for cross-space `page:space/slug`) → the page in the live wiki
   `{web}/wiki/{space}/{slug}`, so the link still reaches a real page.
-- **Terminology links.** `cs:`/`vs:`/`ms:`/`concept:` → the TermX web UI (see §6 for the base).
+- **Terminology links.** `cs:`/`vs:`/`ms:`/`concept:` → the Helex TX web UI (see §6 for the base).
   With only a FHIR base configured, they fall back to FHIR resource URLs.
 - **Home page.** The SSG lands on the first page (`/en/about`); mdbook maps the first page
   to the site root (`/`) and also keeps it at its slug.
@@ -103,7 +157,7 @@ which is stricter. mdbook normalizes content at build time so these never break:
 Terminology directives and links use a **FHIR server**, set once in `.mdbook/config.yml`:
 
 ```yaml
-tx-server: https://your-termx-host/api/fhir   # FHIR API base (…/fhir)
+tx-server: https://your-helextx-host/api/fhir   # FHIR API base (…/fhir)
 ```
 
 - `{{csc:}}` / `{{vsc:}}` are expanded to tables at build time from this server.
@@ -115,14 +169,14 @@ tx-server: https://your-termx-host/api/fhir   # FHIR API base (…/fhir)
 
 ### Generator config from the wiki (`space.json` → `ssg`)
 
-The TermX Wiki space carries the generator settings you'd otherwise hand-write in
+The Owliki space carries the generator settings you'd otherwise hand-write in
 `.mdbook/config.yml`, exported under an `ssg` block in `space.json`:
 
 ```json
 "ssg": {
   "theme":  { "skin": "helex", "accent": "#2f6feb", "switcher": true },
   "footer": { "message": "…", "copyright": "…" },
-  "txServer": "https://your-termx-host/api/fhir",
+  "txServer": "https://your-helextx-host/api/fhir",
   "search": true,
   "logo": "files/1/logo.png"
 }
@@ -142,17 +196,23 @@ optional, or override individual fields per repo. Applied by `applySpaceConfig` 
    are supported; exotic property projections may need extra mapping.
 3. **PlantUML / Mermaid offline** — PlantUML needs the render server at view time; both could
    be pre-rendered to static SVG at build time if fully-offline output is required.
+4. **Publisher-side, not here** — `{{drawio:}}` wants `pageId` in `pages.json` (§2.1) and
+   `{{def:}}` wants `resources/structure-definition/<code>.json` in the published tree (§2.2).
+   Both are one addition each to helex-tx's `WikiMdbookDataHandler`; the generator reads them
+   already.
 
 Source-syntax convergence (which constructs are rewritten in the wiki so both renderers agree,
 and which are handled here) is specified in the wiki repo's `docs/wiki-mdbook-syntax.md`.
 
 ## 8. Where it's implemented in mdbook
 
-- **Markdown plugins:** `src/markdown/` — `index.mjs` (chain + meta guard), `termx-links.mjs`,
-  `termx-images.mjs`, `termx-embeds.mjs`, `collapsible.mjs`, `tabset.mjs`, `diagrams.mjs`,
+- **Markdown plugins:** `src/markdown/` — `index.mjs` (chain + meta guard), `owliki-links.mjs`,
+  `owliki-images.mjs`, `owliki-embeds.mjs`, `collapsible.mjs`, `tabset.mjs`, `diagrams.mjs`,
   `table-attrs.mjs` (orphaned `{…}` after a multimd table)
 - **Build-time expansions / normalization:** `src/ingest/` — `structure-definition.mjs`,
-  `concept-matrix.mjs`, `cards.mjs`, `sanitize.mjs`, `images.mjs`
+  `concept-matrix.mjs`, `cards.mjs`, `sanitize.mjs`, `images.mjs`, and for `{{drawio:}}`
+  `diagram-files.mjs` (the version rules, mirroring the wiki's own) + `drawio.mjs` (which
+  page's attachments, and the expansion)
 - **SEO / metadata:** `src/ingest/seo.mjs` + `src/vitepress.mjs` (`seoHead`) — per-page
   title/description and space-level description/languages/URL are read from the export
   (`space.json` / `pages.json`) with inference as the fallback; page tags become
@@ -160,7 +220,7 @@ and which are handled here) is specified in the wiki repo's `docs/wiki-mdbook-sy
 - **Generator config from the space:** `src/config.mjs` (`applySpaceConfig`) merges the
   `space.json` `ssg` block (theme/footer/tx-server/search/logo) as config defaults, with a
   repo's `.mdbook/config.yml` still winning
-- **Ingestion adapters:** `src/ingest/` — `termx.mjs`, `gitbook.mjs`
+- **Ingestion adapters:** `src/ingest/` — `owliki.mjs`, `gitbook.mjs`
 - **Client runtime + styles:** `src/theme/` — mermaid + `<tx-sd-view>` registration +
   current-link marking, `styles/smart-text.css`, `skins/`
 - **Vendored viewer:** `vendor/structure-definition-viewer/`

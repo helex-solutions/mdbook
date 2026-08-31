@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { resolveBase, resolveSiteUrl, applySpaceConfig } from '../src/config.mjs'
+import { resolveBase, resolveSiteUrl, applySpaceConfig, loadConfig } from '../src/config.mjs'
 
 const ENV_KEYS = ['GITHUB_ACTIONS', 'GITHUB_REPOSITORY', 'MDBOOK_BASE']
 const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]))
@@ -91,7 +91,7 @@ test('applySpaceConfig: space ssg fills config that was not set explicitly', () 
     ssg: {
       theme: { skin: 'helex', accent: '#0aa', switcher: true },
       footer: { message: 'Guide', copyright: '(c) 2026' },
-      txServer: 'https://dev.termx.org/api/fhir',
+      txServer: 'https://tx.example.org/api/fhir',
       search: false,
       logo: 'files/1/logo.png'
     }
@@ -100,7 +100,7 @@ test('applySpaceConfig: space ssg fills config that was not set explicitly', () 
   assert.equal(cfg.theme.accent, '#0aa')
   assert.equal(cfg.theme.switcher, true)
   assert.deepEqual(cfg.footer, { message: 'Guide', copyright: '(c) 2026' })
-  assert.equal(cfg.txServer, 'https://dev.termx.org/api/fhir')
+  assert.equal(cfg.txServer, 'https://tx.example.org/api/fhir')
   assert.equal(cfg.search, false)
   assert.equal(cfg.site.logo, 'files/1/logo.png')
   assert.equal(cfg.site.description, 'From the wiki')
@@ -135,4 +135,20 @@ test('applySpaceConfig: no-op when the space has no ssg block', () => {
   assert.equal(cfg.theme.skin, 'default')
   assert.equal(cfg.footer, null)
   assert.equal(cfg.txServer, null)
+})
+
+test('source format: `termx` still resolves to `owliki`', () => {
+  // Every site already published with mdbook has `format: termx` in its config.
+  // A format name is a contract with those repositories: renaming it without an
+  // alias would turn the next release into "Unknown source format" for all of
+  // them. `owliki` is the name to write in new configs.
+  const dir = tmpProject()
+  fs.mkdirSync(path.join(dir, '.mdbook'), { recursive: true })
+  fs.writeFileSync(
+    path.join(dir, '.mdbook', 'config.yml'),
+    'source:\n  format: termx\n  meta: docs\n'
+  )
+  const cfg = loadConfig(dir)
+  assert.equal(cfg.source.format, 'owliki', 'the alias resolves')
+  assert.equal(cfg.source.meta, 'docs', 'and the rest of the source block survives it')
 })

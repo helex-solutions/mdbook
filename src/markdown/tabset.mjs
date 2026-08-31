@@ -1,4 +1,4 @@
-// Turns TermX / Wiki.js tab groups into pure-CSS tabs.
+// Turns Owliki / Wiki.js tab groups into pure-CSS tabs.
 //
 //   ## {.tabset}
 //   ### First Tab
@@ -8,7 +8,7 @@
 //   ##                <- optional closing empty h2
 //
 // becomes interleaved <input><label><div class="mdbook-tab">…</div> inside a
-// .mdbook-tabset, matching the tutorial.termx.org markup so the CSS
+// .mdbook-tabset, matching the reference wiki's tabset markup so the CSS
 // `input:checked + label + .tab` toggles panels with no JavaScript.
 //
 // Runs as a core rule (after markdown-it-attrs, so the h2 carries `.tabset`).
