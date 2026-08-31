@@ -215,6 +215,9 @@ export function stageContent(cfg, model, openapiSpecs = {}) {
           for (const m of text.matchAll(/(?:files|attachments)\/([A-Za-z0-9_-]+)\//g)) {
             aclAssets.push({ prefix: `${at}/${m[1]}/`, access })
           }
+          // A generated PDF page and the file it previews are one document: the
+          // page is worth gating only if the file behind it is gated too.
+          if (f.pdf) aclAssets.push({ prefix: f.pdf, access })
         }
       }
       if (isOwliki) {
@@ -264,7 +267,9 @@ export function stageContent(cfg, model, openapiSpecs = {}) {
       })
       fs.writeFileSync(dest, text)
     } else {
-      if (aclOpts) {
+      // `asset: true` files are staged copies (a PDF under public/), not routes —
+      // their access follows the page that presents them, resolved above.
+      if (aclOpts && !f.asset) {
         const access = resolveAccess(f.dest, { pageAccess: normalizeAccess(f.access), ...aclOpts })
         if (isProtected(access)) aclEntries.push({ dest: f.dest, access })
       }

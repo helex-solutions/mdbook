@@ -35,6 +35,7 @@ Real sites built with mdbook — click a thumbnail for the live site (see
 - 🧩 **TermX smart-text** — callouts, tabsets, links-list/grid-list, `+++` collapsibles, `page:`/`cs:`/`vs:`/`concept:` links, `files/` images, page icons, GitBook card tables
 - 📊 **Diagrams** — draw.io (including the wiki's versioned `{{drawio:name}}` macro, which always resolves to the newest saved version), Mermaid, and PlantUML (opt-in server, see `diagrams:`)
 - 💻 **Code** — Shiki highlighting for every fenced block; a fence that cites a source file (```` ```43:58:src/Foo.java ````) is highlighted by the file's extension and captioned with the path
+- 📄 **PDFs** — a PDF stored in the repo is published like a page: listed in the menu, previewed inline and downloadable (see [PDFs](#pdfs))
 - 🌐 **OpenAPI** — render one or many OpenAPI 3.1 / 3.0 / Swagger 2.0 documents into searchable reference pages, from a whole document down to a single operation, with an optional try-it console authenticated via OpenID Connect (see [OpenAPI](#openapi))
 - 🔗 **Terminology** — `{{def:}}` StructureDefinition viewer, and `{{csc:}}`/`{{vsc:}}` concept tables fetched from a FHIR server at build time
 - 🏷️ **SEO** — per-page titles/descriptions, `sitemap.xml`, canonical + Open Graph/Twitter tags, JSON-LD and `robots.txt`. Descriptions, languages and site URL are read from the TermX export when authored (site URL also auto-detected in CI), with first-paragraph/CI inference as the fallback; page **tags** are emitted as `<meta name="keywords">`
@@ -185,6 +186,7 @@ source:
   spaces:                      # termx only — multi-space portal (see Multi-space portals)
     handbook: spaces/handbook  #   mount key -> wiki-ssg export dir
     api: spaces/api
+  pdf: true                    # gitbook only — publish repo PDFs as pages (see PDFs)
   exclude:                     # hide files/folders from BOTH the pages and the menu
     - CLAUDE.md                #   bare name -> matches at any depth
     - _templates               #   folder name -> the whole subtree
@@ -304,6 +306,31 @@ sidebarTitle: ACC.11 Posting
 
 # ACC.11 — Posting Rules (Common Spec, Consolidated)
 ```
+
+### PDFs
+
+A PDF stored in the content repo is published like a markdown page. `specs/handbook.pdf`
+becomes the page `/specs/handbook` — listed in the folder-tree menu next to the markdown
+pages (with a PDF icon), reachable by breadcrumb, and rendering the file inline with **Open**
+and **Download** actions. The file itself is published at its own repo-relative path
+(`/specs/handbook.pdf`), so links to it — and links written before mdbook, pointing at the
+file in the repo — resolve too.
+
+The rules follow the ones markdown already uses:
+
+- **A markdown page of the same name wins.** With `spec.md` next to an exported `spec.pdf`,
+  `/specs/spec` stays the authored page and the PDF stays a plain download. Nothing is
+  generated over a page you wrote.
+- **`README.pdf` is the folder's index**, at any depth — `reports/README.pdf` is `/reports/`.
+- **The page title is the file name**, prettified the way folder-tree labels are:
+  `annual-report_2026.pdf` → *Annual Report 2026*.
+- **`source.exclude` applies**, so a draft or an internal folder is hidden from the pages and
+  the menu in one place. The assets directory (`.gitbook/assets`) and dot-directories are
+  skipped — those files are already published as assets.
+- **On a gated site** the PDF inherits the access of the page that previews it, so the file
+  cannot be fetched around the page (see [Authentication](#authentication)).
+
+Set `source.pdf: false` to keep PDFs out of the site entirely.
 
 **Breadcrumbs and related pages.** Every page gets a breadcrumb trail, and pages whose
 filenames start with the same document id in *different* top-level sections are cross-linked
