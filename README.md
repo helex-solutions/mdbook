@@ -14,13 +14,11 @@ Real sites built with mdbook — click a thumbnail for the live site (see
 
 <table>
 <tr>
-<td width="33%" valign="top"><a href="https://hl7.lt"><img src="docs/assets/mdbook-hl7lt.png" alt="HL7 Lithuania Registry built with mdbook"></a></td>
-<td width="33%" valign="top"><a href="https://termx-health.github.io/tutorial/"><img src="docs/assets/mdbook-tutorial.png" alt="TermX tutorial built with mdbook"></a></td>
-<td width="33%" valign="top"><a href="https://helex-solutions.github.io/ib-portfolio/"><img src="docs/assets/mdbook-portfolio.png" alt="Portfolio built with mdbook"></a></td>
+<td width="50%" valign="top"><a href="https://hl7.lt"><img src="docs/assets/mdbook-hl7lt.png" alt="HL7 Lithuania Registry built with mdbook"></a></td>
+<td width="50%" valign="top"><a href="https://helex-solutions.github.io/ib-portfolio/"><img src="docs/assets/mdbook-portfolio.png" alt="Portfolio built with mdbook"></a></td>
 </tr>
 <tr>
 <td align="center"><a href="https://hl7.lt"><b>HL7 Lithuania Registry</b></a><br><sub>National FHIR IG registry · <code>owliki</code> source</sub></td>
-<td align="center"><a href="https://termx-health.github.io/tutorial/"><b>TermX tutorial</b></a><br><sub>Docs with smart-text &amp; terminology · <code>owliki</code> source</sub></td>
 <td align="center"><a href="https://helex-solutions.github.io/ib-portfolio/"><b>Portfolio</b></a><br><sub>Personal site · <code>gitbook</code> source</sub></td>
 </tr>
 </table>
@@ -113,7 +111,7 @@ in [Authentication](#authentication).
        steps:
          - uses: actions/checkout@v7
          - id: mdbook
-           uses: helex-solutions/mdbook@v1.7.0   # pin to a release tag (see Versioning)
+           uses: helex-solutions/mdbook@v1.8.0   # pin to a release tag (see Versioning)
            with: { project: . }
          - uses: actions/configure-pages@v6
          - uses: actions/upload-pages-artifact@v5
@@ -139,7 +137,7 @@ in [Authentication](#authentication).
 
 ### Versioning
 
-Pin the action to a **release tag** (e.g. `helex-solutions/mdbook@v1.7.0`) so your site builds are
+Pin the action to a **release tag** (e.g. `helex-solutions/mdbook@v1.8.0`) so your site builds are
 deterministic — `main` can move without silently redeploying your site. See the
 [releases](https://github.com/helex-solutions/mdbook/releases). Use `@main` only if you want the
 latest, unreleased changes.
@@ -148,19 +146,30 @@ There is deliberately **no floating `@v1`** to track: a moving major tag would r
 on someone else's schedule, which is the thing pinning exists to prevent. Every published tag is an
 exact version, so `@v1` resolves to nothing — upgrade by changing the pin.
 
-**Upgrading to `v1.7.0`.** One config change is required first, and only for wiki-export sites:
-`source.format` must read `owliki`. The format's earlier name was accepted as an alias through
-`v1.6.0`; from `v1.7.0` a config still carrying it is rejected by name, so the build stops with a
-message telling you to update rather than quietly building on a retired spelling. GitBook sites
-(`format: gitbook`, and anything auto-detected) need no change.
+**Upgrading to `v1.8.0`.** Two things change for wiki-export sites, both one line each.
+
+`comments.mapping` must read `owliki` if it carried the retired name. Both spellings resolved to
+the same discussion term — the page code — so changing the word keeps every existing thread; a
+config left alone stops threading by page code instead of silently threading by something else.
+The page code is published as `<meta name="owliki:page">`, and the earlier tags under the former
+name are no longer emitted.
+
+`{{def:}}` renders an include card naming the definition rather than a StructureDefinition element
+tree. The viewer that drew the tree came from a package this project no longer depends on, and the
+Helex equivalent does not yet ship in a form a static site can use. Sites that never shipped
+`resources/structure-definition/` — every wiki-published one — already saw the card and are
+unaffected.
+
+Sites on `v1.7.0` need nothing else, and GitBook sites (`format: gitbook`, and anything
+auto-detected) need nothing at all.
 
 **To publish a new mdbook version:**
 
 ```bash
-git tag -a v1.7.1 -m "…" && git push origin v1.7.1   # patch; v1.8.0 for features
+git tag -a v1.8.1 -m "…" && git push origin v1.8.1   # patch; v1.9.0 for features
 ```
 
-Then bump `@v1.7.0` → `@v1.7.1` in each consumer's `.github/workflows/mdbook.yml` and push —
+Then bump `@v1.8.0` → `@v1.8.1` in each consumer's `.github/workflows/mdbook.yml` and push —
 a deliberate step, so upgrades are reviewed rather than automatic.
 
 ## Local preview
@@ -678,7 +687,7 @@ such a host is cosmetic. Deploy the dist to your own server and run `serve` ther
 Action does this in one step:
 
 ```yaml
-- uses: helex-solutions/mdbook@v1.7.0
+- uses: helex-solutions/mdbook@v1.8.0
   with:
     project: .
     deploy-target: deploy@docs.example.org:/srv/docs/site
@@ -710,9 +719,9 @@ mdbook can render a [Giscus](https://giscus.app) comment box after each page, ba
                          #   or use pathname / title / og:title
    ```
 
-   `mapping: termx` was the former name and is **no longer accepted** — change that one
-   word and every existing thread is kept, because the discussion term is the page code
-   either way. The page code is also published as `<meta name="owliki:page">`.
+   The mapping's former name is **no longer accepted** — set it to `owliki` and every
+   existing thread is kept, because the discussion term is the page code either way. The
+   page code is also published as `<meta name="owliki:page">`.
 
 Readers post with a one-time **“Sign in with GitHub”**; comments are stored as Discussions in the
 repo (moderate/reply there or inline), and the widget follows the site's light/dark theme. Omit the
@@ -747,7 +756,6 @@ Real repositories you can copy from — each links the live site and its `.mdboo
 | Project | Source | Live site | Repo |
 |---|---|---|---|
 | HL7 Lithuania Registry | `owliki` (en/lt) | <https://hl7.lt> | [HL7LT/hl7lt-website](https://github.com/HL7LT/hl7lt-website/blob/main/.mdbook/config.yml) |
-| TermX tutorial | `owliki` (en/lt) | <https://termx-health.github.io/tutorial/> | [termx-health/tutorial](https://github.com/termx-health/tutorial/blob/main/.mdbook/config.yml) |
 | Portfolio | `gitbook` | <https://helex-solutions.github.io/ib-portfolio/> | [helex-solutions/ib-portfolio](https://github.com/helex-solutions/ib-portfolio/blob/main/.mdbook/config.yml) |
 
 Each config option, and a project that uses it:
@@ -755,16 +763,16 @@ Each config option, and a project that uses it:
 | Config | Example project(s) |
 |---|---|
 | `source.format: gitbook` (`SUMMARY.md` + `README.md` + `.gitbook/assets`) | portfolio |
-| `source.format: owliki` + `meta` / `pages` (under `source/`) | hl7lt-website, tutorial |
+| `source.format: owliki` + `meta` / `pages` (under `source/`) | hl7lt-website |
 | `site.url` (sitemap, canonical, Open Graph) | hl7lt-website |
-| `theme.skin` | hl7lt-website (`hl7lt`), tutorial (`helex`), portfolio (`default`) |
+| `theme.skin` | hl7lt-website (`hl7lt`), portfolio (`default`) |
 | `search` | all three |
-| `footer` (`message` + `copyright`) | hl7lt-website, tutorial |
+| `footer` (`message` + `copyright`) | hl7lt-website |
 | `nav` | hl7lt-website |
 | `locales` (per-locale menu labels/links) | hl7lt-website |
-| `tx-server` (`{{csc:}}` / `{{vsc:}}` tables, `cs:` / `vs:` links) | tutorial |
-| `{.card-grid}` card grids | hl7lt-website, tutorial |
-| Multilingual + locale-switch redirect stubs (`pages.json`) | hl7lt-website, tutorial |
+| `tx-server` (`{{csc:}}` / `{{vsc:}}` tables, `cs:` / `vs:` links) | hl7lt-website |
+| `{.card-grid}` card grids | hl7lt-website |
+| Multilingual + locale-switch redirect stubs (`pages.json`) | hl7lt-website |
 | `comments` (Giscus) | see [Comments](#comments-github-discussions) above |
 
 ## License
