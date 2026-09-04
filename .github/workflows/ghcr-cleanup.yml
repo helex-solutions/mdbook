@@ -1,0 +1,78 @@
+name: GHCR packages cleanup
+
+# Prunes old versions of the ghcr.io/helex-solutions/mdbook container package.
+# docker.yml publishes a version per release, and nothing has ever pruned them —
+# this repo was publishing images with no cleanup at all, which is a package
+# quietly growing forever behind a green check. The same omission across ten
+# emr-* packages held 1704 unpruned versions by 2026-08-28 and ended in the org's
+# Actions artifact storage quota filling up, which broke `upload-artifact` in
+# every repo — the symptom surfaced nowhere near the cause.
+#
+# Policy matches emr-repo and emr-keycloak: keep everything built inside the
+# `older_than` window outright, plus a floor of the N most-recent tagged versions
+# for anything older; delete the rest and any orphaned untagged manifests.
+# The window is the rollback guarantee; the count is only the floor beneath it,
+# because what a pure count buys in TIME moves with build cadence.
+#
+# The count arithmetic here follows emr-repo's, not emr-keycloak's: docker.yml
+# builds multi-arch (setup-qemu + a `platforms` input), so one release is an index
+# plus a manifest per architecture rather than a single record. N pullable
+# generations therefore costs several tagged records, and 11 is the floor that
+# buys a sane number of them. emr-keycloak's copy documents the single-arch case
+# where 11 would mean 11 — do not copy a count between these files without
+# checking which shape the repo builds.
+#
+# `exclude-tags: latest` is what stands between this job and anything pulling the
+# published action image.
+
+on:
+  schedule:
+    - cron: '0 3 * * 0' # Sundays 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run — log deletions without performing them'
+        type: boolean
+        default: true
+      keep_n_tagged:
+        description: 'Floor of tagged versions kept, for images older than the window'
+        type: string
+        default: '11'
+      older_than:
+        description: 'Retention window — nothing built within this interval is deleted at all (e.g. "5 days")'
+        type: string
+        default: '5 days'
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ghcr-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    # Self-hosted: GitHub-hosted minutes are budget-blocked org-wide, so a job
+    # left on ubuntu-latest never starts and prunes nothing, silently.
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Prune old GHCR package versions
+        uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          owner: helex-solutions
+          packages: mdbook
+          exclude-tags: latest
+          older-than: ${{ github.event.inputs.older_than || '5 days' }}
+          keep-n-tagged: ${{ github.event.inputs.keep_n_tagged || '11' }}
+          delete-untagged: true
+          delete-partial-images: true
+          # Re-resolves each surviving index's children against the registry after
+          # the run. A version count cannot tell you a tag still pulls; this is the
+          # check that catches a prune that broke `docker pull` by the tag while
+          # leaving the tag itself in place. Matters more here than most: this
+          # image is multi-arch, and the widely-copied "delete every untagged
+          # version" recipe orphans arch manifests under a surviving index.
+          validate: true
+          dry-run: ${{ github.event.inputs.dry_run || 'false' }}
+          token: ${{ secrets.GITHUB_TOKEN }}

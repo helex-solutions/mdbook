@@ -28,7 +28,7 @@ on:
 
 jobs:
   image:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     permissions:
       contents: read
       packages: write
@@ -83,8 +83,19 @@ jobs:
       - name: Smoke-test the image against demo/
         run: |
           set -eu
-          sudo chown -R 10001:10001 demo   # MDBOOK_BUILD writes .mdbook/ into the volume
+          # Run as the runner's own uid, not the image's 10001. Two reasons, both
+          # specific to self-hosted runners:
+          #   - the workspace PERSISTS between jobs, so anything the container
+          #     writes as another uid is undeletable afterwards and the NEXT job
+          #     dies in actions/checkout with "EACCES: permission denied, rmdir
+          #     demo/.mdbook/dist". A hosted runner gets a fresh VM, so it never
+          #     shows up there.
+          #   - the original `sudo chown -R 10001:10001` cannot work here anyway:
+          #     these runners give the runner no passwordless sudo.
+          # Owning the output as the runner makes both problems disappear, and no
+          # chmod is needed since the runner already owns the checkout.
           docker run -d --name smoke -p 8080:8080 -e MDBOOK_BUILD=1 \
+            --user "$(id -u):$(id -g)" \
             -v "$PWD/demo:/site" mdbook:smoke
           for _ in $(seq 60); do
             if curl -fsS -o /tmp/home.html http://127.0.0.1:8080/ && grep -qi '<title' /tmp/home.html; then
