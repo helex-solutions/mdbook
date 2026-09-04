@@ -12,13 +12,6 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          # 22, not 26, because this runs on the org's self-hosted runners now.
-          # Node 24+ prebuilt binaries link libatomic.so.1, which GitHub's hosted
-          # image ships and these runners do not: node then dies at startup with
-          # "error while loading shared libraries: libatomic.so.1" and every step
-          # exits 127. 22 is the version emr-repo already runs on this same fleet.
-          # Revisit if this action needs to be tested against a newer Node — the
-          # fix on that side is installing libatomic1 on the runners.
-          node-version: '22'
+          node-version: '26'
       - run: npm ci || npm install
       - run: npm test
