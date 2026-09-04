@@ -47,7 +47,11 @@ jobs:
       - name: Build the demo site inside the image
         run: |
           set -eu
-          sudo chown -R 10001:10001 demo   # the image drops privileges; /site must be writable
+          # Was `sudo chown -R 10001:10001`. GitHub-hosted runners give the
+          # runner passwordless sudo; these self-hosted ones do not, so that
+          # line fails with "sudo: a password is required". The image drops privileges; /site must be writable,
+          # and making it world-writable needs no privilege at all.
+          chmod -R a+rwX demo
           docker run --rm -v "$PWD/demo:/site" mdbook:pr build --project /site
           test -s demo/.mdbook/dist/index.html || {
             echo '::error::the image built no site'; exit 1;

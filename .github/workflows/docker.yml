@@ -83,7 +83,11 @@ jobs:
       - name: Smoke-test the image against demo/
         run: |
           set -eu
-          sudo chown -R 10001:10001 demo   # MDBOOK_BUILD writes .mdbook/ into the volume
+          # Was `sudo chown -R 10001:10001`. GitHub-hosted runners give the
+          # runner passwordless sudo; these self-hosted ones do not, so that
+          # line fails with "sudo: a password is required". MDBOOK_BUILD writes .mdbook/ into the volume,
+          # and making it world-writable needs no privilege at all.
+          chmod -R a+rwX demo
           docker run -d --name smoke -p 8080:8080 -e MDBOOK_BUILD=1 \
             -v "$PWD/demo:/site" mdbook:smoke
           for _ in $(seq 60); do
