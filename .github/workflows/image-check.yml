@@ -47,12 +47,19 @@ jobs:
       - name: Build the demo site inside the image
         run: |
           set -eu
-          # Was `sudo chown -R 10001:10001`. GitHub-hosted runners give the
-          # runner passwordless sudo; these self-hosted ones do not, so that
-          # line fails with "sudo: a password is required". The image drops privileges; /site must be writable,
-          # and making it world-writable needs no privilege at all.
-          chmod -R a+rwX demo
-          docker run --rm -v "$PWD/demo:/site" mdbook:pr build --project /site
+          # Run as the runner's own uid, not the image's 10001. Two reasons, both
+          # specific to self-hosted runners:
+          #   - the workspace PERSISTS between jobs, so anything the container
+          #     writes as another uid is undeletable afterwards and the NEXT job
+          #     dies in actions/checkout with "EACCES: permission denied, rmdir
+          #     demo/.mdbook/dist". A hosted runner gets a fresh VM, so it never
+          #     shows up there.
+          #   - the original `sudo chown -R 10001:10001` cannot work here anyway:
+          #     these runners give the runner no passwordless sudo.
+          # Owning the output as the runner makes both problems disappear, and no
+          # chmod is needed since the runner already owns the checkout.
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD/demo:/site" mdbook:pr build --project /site
           test -s demo/.mdbook/dist/index.html || {
             echo '::error::the image built no site'; exit 1;
           }
