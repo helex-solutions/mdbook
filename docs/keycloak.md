@@ -85,7 +85,7 @@ control over the button label and flows:
 ```sh
 $KC create identity-provider/instances -r $R \
   -s alias=google -s providerId=oidc -s enabled=true \
-  -s displayName="Continue with Google" \
+  -s displayName="Google" \
   -s firstBrokerLoginFlowAlias="first broker login" \
   -s 'config.issuer=https://accounts.google.com' \
   -s 'config.authorizationUrl=https://accounts.google.com/o/oauth2/v2/auth' \
@@ -103,6 +103,11 @@ The provider is created with `storeToken: true` (so a session can be refreshed
 against Google), Google's discovery URL alongside the explicit endpoints, and
 three identity-provider mappers recording `sub`, `amr` and `acr` as user
 attributes — who the user is at the provider, and how they authenticated.
+
+The display name is the **bare provider name**. It is not only button text:
+Keycloak also puts it into the account-link confirmation email (§3b), where
+"Continue with Google" reads as a sentence fragment. The `helex` login theme adds
+"Continue with" on the button itself.
 
 The **client secret comes from `.env`**, like every other credential these
 scripts use — set `GOOGLE_CLIENT_SECRET` and re-run `setup-idp.sh google`. `.env`
@@ -165,9 +170,10 @@ Three things follow from GitHub not being OIDC:
   when the user has made it private; the scope is what lets Keycloak read the
   verified primary address from `/user/emails`. Without it an identity arrives
   with no email at all and cannot be matched to a pre-created reader.
-- **The address is verified at GitHub, not by Keycloak.** On a realm with no
-  SMTP, set `KC_IDP_TRUST_EMAIL=true` or the address is imported unverified and
-  nothing can ever deliver the mail that would verify it.
+- **The address is verified at GitHub, not by Keycloak.** Keycloak takes the
+  primary address and does not check its `verified` flag, relying on GitHub's
+  rule that a primary address must be verified. `KC_IDP_TRUST_EMAIL=true` marks
+  it verified on import; it does not stand in for the confirmation in §3b.
 
 **In the GitHub UI** — organisation-owned, so it outlives one person's account:
 *Organization settings → Developer settings → OAuth Apps → New OAuth App*, with
@@ -228,9 +234,19 @@ matter**:
 
 > **SMTP is a hard prerequisite.** Bind this flow on a realm without a working
 > sender and every invitation dead-ends with no way back. The script warns when
-> `smtpServer` is empty; verify properly with
-> `POST /admin/realms/<realm>/testSMTPConnection`, which uses Keycloak's own
-> JVM and mail code.
+> `smtpServer` is empty (`setup-realm.sh` writes it from the `SMTP_*`
+> variables). Verify delivery with
+> `PUT /admin/realms/<realm>/users/<id>/execute-actions-email` against a real
+> reader — a 204 means Keycloak's own mail code handed the message over. The
+> built-in `testSMTPConnection` sends to the **calling admin's** address, and
+> the `master` admin has none, so it fails with a bare 500 that says nothing
+> about the relay.
+
+**`trustEmail` does not weaken this.** Keycloak 26.4's
+`IdpEmailVerificationAuthenticator` never reads it: it lets the step fall
+through only when the realm has no SMTP, or when the reader changed the email or
+username on the review page — which these realms prevent, since both fields are
+admin-only. `trustEmail` only marks a *new* reader's imported address verified.
 
 Creating the flow does not bind it: binding is per provider
 (`firstBrokerLoginFlowAlias`), which is why `setup-idp.sh` takes

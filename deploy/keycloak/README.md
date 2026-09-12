@@ -37,7 +37,7 @@ All variables live in [`.env.sample`](.env.sample). The ones that matter most:
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth client; a provider with no credentials is skipped, not half-created — so re-running without a secret never clobbers one already set |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub OAuth App, same skip-if-empty rule. **One App carries one callback URL**, so a second realm needs a second App |
 | `KC_FIRST_BROKER_LOGIN_FLOW` | flow bound to every provider; point it at what `setup-first-broker-login.sh` creates |
-| `KC_IDP_TRUST_EMAIL` | trust the address a provider returns as verified — set `true` on a realm with no SMTP |
+| `KC_IDP_TRUST_EMAIL` | trust the address a provider returns as verified (`true` on the docs realms); marks a new reader's address verified, never skips the email confirmation for an existing account |
 
 `.env` is **parsed, not sourced** — an unquoted value containing spaces would
 otherwise execute as a command, and a config file should never be able to run

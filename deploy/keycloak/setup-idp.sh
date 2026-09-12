@@ -83,23 +83,25 @@ PY
   echo "           ${KC_PUBLIC_URL}/realms/${REALM}/broker/${alias}/endpoint"
 }
 
-# The first-broker-login flow every provider here is bound to. The built-in one
-# demands email verification or a password when a federated identity arrives for
-# an account that already exists — a dead end on a realm with no SMTP whose users
-# hold no passwords, which is exactly how invitations work on the docs realms
-# (a reader is pre-created by email and put in mdbook-viewer before first login).
-# Those realms carry a copied flow with Handle Existing Account DISABLED and
-# idp-auto-link ALTERNATIVE; point this at it. See docs/keycloak.md.
+# The first-broker-login flow every provider here is bound to. It decides what
+# happens when a federated identity arrives for an account that already exists —
+# which is how invitations work on the docs realms: a reader is pre-created by
+# email and put in mdbook-viewer before first login. The built-in flow offers
+# email verification or password re-authentication, and nobody here holds a
+# password, so the docs realms bind the flow setup-first-broker-login.sh builds:
+# confirm, then verify by email, re-authentication disabled, idp-auto-link
+# removed. It needs a working smtpServer (setup-realm.sh). See docs/keycloak.md §3b.
 FIRST_BROKER_LOGIN_FLOW="${KC_FIRST_BROKER_LOGIN_FLOW:-first broker login}"
 
 # Whether to take the provider's word that the address it returns is verified.
 # Default false — the conservative reading, and what an untrusted provider
-# deserves. The docs realms set it true, because they have no SMTP: without it a
-# reader's address is imported unverified, and any later flow that asks for
-# verification has no way to deliver the mail. Both providers wired here return
-# only verified addresses (Google from the id_token, GitHub from /user/emails
-# under the user:email scope), so trusting them is a statement about those two
-# providers, not a blanket one. Live docs-emr carries trustEmail=true.
+# deserves. The docs realms set it true: both providers wired here return only
+# verified addresses (Google from the id_token, GitHub its primary address from
+# /user/emails, which GitHub requires to be verified), so trusting them is a
+# statement about those two providers, not a blanket one. It marks a NEW reader's
+# imported address verified. It does not skip the email confirmation for an
+# EXISTING account — Keycloak's IdpEmailVerificationAuthenticator never reads it.
+# Live docs-tx and docs-emr carry trustEmail=true.
 IDP_TRUST_EMAIL="${KC_IDP_TRUST_EMAIL:-false}"
 
 setup_github() {
@@ -119,7 +121,10 @@ import json, sys
 cid, sec, fbl, trust = sys.argv[1:5]
 print(json.dumps({
     "alias": "github", "providerId": "github", "enabled": True,
-    "displayName": "Continue with GitHub",
+    # The bare provider name. The helex theme adds "Continue with" on the button,
+    # and Keycloak also puts this name in the account-link confirmation email,
+    # where a phrase would read as a sentence fragment.
+    "displayName": "GitHub",
     "trustEmail": trust == "true", "linkOnly": False, "hideOnLogin": False,
     "storeToken": True, "addReadTokenRoleOnCreate": False,
     "authenticateByDefault": False,
@@ -157,7 +162,8 @@ PY
 setup_google() {
   # Google's own discovery document supplies these; they are spelled out so the
   # provider works on a network that cannot reach the discovery URL at setup.
-  create_idp google "Continue with Google" \
+  # Bare name, for the same reason as GitHub's displayName above.
+  create_idp google "Google" \
     "https://accounts.google.com/o/oauth2/v2/auth" \
     "https://oauth2.googleapis.com/token" \
     "https://openidconnect.googleapis.com/v1/userinfo" \
