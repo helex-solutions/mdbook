@@ -111,7 +111,7 @@ in [Authentication](#authentication).
        steps:
          - uses: actions/checkout@v7
          - id: mdbook
-           uses: helex-solutions/mdbook@v1.8.1   # pin to a release tag (see Versioning)
+           uses: helex-solutions/mdbook@v1.8.2   # pin to a release tag (see Versioning)
            with: { project: . }
          - uses: actions/configure-pages@v6
          - uses: actions/upload-pages-artifact@v5
@@ -137,7 +137,7 @@ in [Authentication](#authentication).
 
 ### Versioning
 
-Pin the action to a **release tag** (e.g. `helex-solutions/mdbook@v1.8.1`) so your site builds are
+Pin the action to a **release tag** (e.g. `helex-solutions/mdbook@v1.8.2`) so your site builds are
 deterministic — `main` can move without silently redeploying your site. See the
 [releases](https://github.com/helex-solutions/mdbook/releases). Use `@main` only if you want the
 latest, unreleased changes.
@@ -147,7 +147,7 @@ on someone else's schedule, which is the thing pinning exists to prevent. Every 
 exact version, so `@v1` resolves to nothing — upgrade by changing the pin.
 
 **Upgrading from `v1.7.0`.** Two things change for wiki-export sites, both one line each. From
-`v1.8.0` there is nothing to do — `v1.8.1` is a patch.
+`v1.8.0` there is nothing to do — `v1.8.1` and `v1.8.2` are patches.
 
 `comments.mapping` must read `owliki` if it carried the retired name. Both spellings resolved to
 the same discussion term — the page code — so changing the word keeps every existing thread; a
@@ -167,10 +167,10 @@ nothing at all.
 **To publish a new mdbook version:**
 
 ```bash
-git tag -a v1.8.2 -m "…" && git push origin v1.8.2   # patch; v1.9.0 for features
+git tag -a v1.8.3 -m "…" && git push origin v1.8.3   # patch; v1.9.0 for features
 ```
 
-Then bump `@v1.8.1` → `@v1.8.2` in each consumer's `.github/workflows/mdbook.yml` and push —
+Then bump `@v1.8.2` → `@v1.8.3` in each consumer's `.github/workflows/mdbook.yml` and push —
 a deliberate step, so upgrades are reviewed rather than automatic.
 
 ## Local preview
