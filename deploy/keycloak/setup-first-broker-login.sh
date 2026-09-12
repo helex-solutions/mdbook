@@ -98,16 +98,38 @@ set_requirement() {  # <json> <requirement> <label>
 # ---- 2. order: Create User If Unique above Handle Existing Account ----------
 # Alternatives are evaluated in index order. Reversed, a reader with no existing
 # account is offered the existing-account branch first.
-for _ in 1 2 3 4 5; do
-  cu=$(find_exec "Create User If Unique"); he=$(find_exec "Handle Existing Account")
-  [ -n "$cu" ] && [ -n "$he" ] || die "expected executions missing from ${FLOW}"
-  cui=$(printf '%s' "$cu" | python3 -c 'import json,sys; print(json.load(sys.stdin)["index"])')
-  hei=$(printf '%s' "$he" | python3 -c 'import json,sys; print(json.load(sys.stdin)["index"])')
-  [ "$cui" -lt "$hei" ] && { echo "  ok       Create User If Unique precedes Handle Existing Account"; break; }
-  id=$(printf '%s' "$cu" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
-  api POST "/realms/${REALM}/authentication/executions/${id}/raise-priority" "" >/dev/null
+# Compared on POSITION IN THE LISTING, not on the `index` field: index is scoped
+# to the level, and two executions at the same level can report indices that do
+# not order them against each other the way the flow runs. The listing order is
+# the execution order, so that is what has to be compared. Getting this wrong
+# made the loop raise repeatedly and then give up silently, leaving the branch
+# enabled in the wrong order — the one combination this script exists to avoid.
+ordered=0
+for _ in 1 2 3 4 5 6 7 8; do
+  pos=$(api GET "$EXEC_PATH" | python3 -c '
+import json, sys
+ex = json.load(sys.stdin)
+cu = he = None
+for i, e in enumerate(ex):
+    d = e.get("displayName", "")
+    if d.endswith("Create User If Unique") and cu is None: cu = i
+    if d.endswith("Handle Existing Account") and he is None: he = i
+print(f"{cu} {he} " + (ex[cu]["id"] if cu is not None else ""))
+')
+  set -- $pos
+  cu=$1; he=$2; cuid=${3:-}
+  [ "$cu" != "None" ] && [ "$he" != "None" ] || die "expected executions missing from ${FLOW}"
+  if [ "$cu" -lt "$he" ]; then
+    ordered=1
+    echo "  ok       Create User If Unique precedes Handle Existing Account"
+    break
+  fi
+  api POST "/realms/${REALM}/authentication/executions/${cuid}/raise-priority" "" >/dev/null
   echo "  raised   Create User If Unique"
 done
+# Never enable the existing-account branch in the wrong order: that sends a
+# brand-new reader down it.
+[ "$ordered" = 1 ] || die "could not order Create User If Unique above Handle Existing Account — refusing to enable the branch"
 
 # ---- 3. Handle Existing Account -> ALTERNATIVE ------------------------------
 set_requirement "$(find_exec 'Handle Existing Account')" ALTERNATIVE "Handle Existing Account"
