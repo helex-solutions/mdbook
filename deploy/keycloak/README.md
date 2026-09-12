@@ -12,8 +12,9 @@ cp .env.sample .env      # fill in — .env is gitignored
 | Script | Does |
 |---|---|
 | `setup-realm.sh` | realm, public client, roles, the roles claim mapper, one group per role, optional default role, optional test service account |
-| `setup-idp.sh`   | identity providers (`google`, or `all`) |
-| `setup-all.sh`   | both |
+| `setup-idp.sh`   | identity providers (`google`, `github`, or `all`) |
+| `setup-first-broker-login.sh` | a first-broker-login flow that admits a reader invited *before* their first login |
+| `setup-all.sh`   | realm + identity providers |
 | `lib.sh`         | `.env` loading, admin token, REST helpers |
 
 Everything is **re-runnable**: existing objects are reported and left alone, so
@@ -34,6 +35,9 @@ All variables live in [`.env.sample`](.env.sample). The ones that matter most:
 | `MDBOOK_ROLES` | roles to create — **quote it**, it contains spaces |
 | `MDBOOK_DEFAULT_ROLE` | role granted to everyone who can log in; empty grants nothing |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth client; a provider with no credentials is skipped, not half-created — so re-running without a secret never clobbers one already set |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub OAuth App, same skip-if-empty rule. **One App carries one callback URL**, so a second realm needs a second App |
+| `KC_FIRST_BROKER_LOGIN_FLOW` | flow bound to every provider; point it at what `setup-first-broker-login.sh` creates |
+| `KC_IDP_TRUST_EMAIL` | trust the address a provider returns as verified — set `true` on a realm with no SMTP |
 
 `.env` is **parsed, not sourced** — an unquoted value containing spaces would
 otherwise execute as a command, and a config file should never be able to run
@@ -51,8 +55,10 @@ carry a trailing `# comment` — the value is taken verbatim to the end of the l
 ## After running
 
 1. Register the broker callback with each provider — the script prints it:
-   `<KC_PUBLIC_URL>/realms/<realm>/broker/google/endpoint`. Google answers
-   `Error 400: redirect_uri_mismatch` until it is added, per realm.
+   `<KC_PUBLIC_URL>/realms/<realm>/broker/<alias>/endpoint`. Google answers
+   `Error 400: redirect_uri_mismatch` until it is added, per realm. A Google
+   OAuth client can list several callbacks and so serve several realms; a GitHub
+   OAuth App accepts exactly one, so each realm needs its own App.
 2. Decide what a federated user may read. **They arrive with no roles**, so
    Google login alone yields 403 on a role-gated section — set
    `MDBOOK_DEFAULT_ROLE`, assign the `mdbook-*` groups, or map a provider claim

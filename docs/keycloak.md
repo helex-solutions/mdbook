@@ -145,6 +145,79 @@ IP-allow-list flow that a public docs site should not inherit blindly).
 > in gets `viewer`), assign groups per user, or map a Google claim (e.g. a hosted
 > domain) to a role with an identity-provider mapper.
 
+## 3a. Federated login (GitHub)
+
+GitHub is **OAuth2, not OpenID Connect** — no issuer, no JWKS, no `id_token` — so
+it cannot go through the generic `oidc` provider the Google recipe uses. Keycloak
+ships a built-in `github` provider that already knows the endpoints, and stock
+login themes give it the Octocat:
+
+```sh
+GITHUB_CLIENT_ID=… GITHUB_CLIENT_SECRET=… ./setup-idp.sh github
+```
+
+Three things follow from GitHub not being OIDC:
+
+- **No `sub`/`amr`/`acr` mappers.** Those claims do not exist at GitHub, and
+  `oidc-user-attribute-idp-mapper` is the wrong mapper type for a `github`
+  provider in any case. `setup-idp.sh` deliberately creates none for it.
+- **`user:email` is not optional.** GitHub omits the address from the profile
+  when the user has made it private; the scope is what lets Keycloak read the
+  verified primary address from `/user/emails`. Without it an identity arrives
+  with no email at all and cannot be matched to a pre-created reader.
+- **The address is verified at GitHub, not by Keycloak.** On a realm with no
+  SMTP, set `KC_IDP_TRUST_EMAIL=true` or the address is imported unverified and
+  nothing can ever deliver the mail that would verify it.
+
+**In the GitHub UI** — organisation-owned, so it outlives one person's account:
+*Organization settings → Developer settings → OAuth Apps → New OAuth App*, with
+**Homepage URL** `https://docs.helex.org` and **Authorization callback URL**
+
+```
+https://sso.helex.dev/realms/<realm>/broker/github/endpoint
+```
+
+Then *Generate a new client secret* and copy it — GitHub shows it once.
+
+Unlike Google, **an OAuth App carries exactly one callback URL**, so one App
+cannot serve two realms whose paths differ (`/realms/docs-tx/` vs
+`/realms/docs-emr/`). A second realm needs a second App, or a GitHub *App*,
+which allows ten.
+
+> **GitHub login cannot be restricted to an organisation.** Any GitHub account on
+> earth completes the flow successfully. On a role-gated site that is contained
+> by the role — the reader still needs `mdbook-viewer` — but it means `access:`
+> must not be relaxed to `authenticated` while GitHub is enabled, and a realm
+> default role would effectively publish the site.
+
+## 3b. Admitting a reader who was invited before they logged in
+
+The built-in `first broker login` flow assumes the federated identity is the
+first thing it has seen of a person. These realms work the other way round: a
+reader is **created by email and put in `mdbook-<role>` before they ever log
+in**, because the role is the invitation. When their identity then arrives,
+*Create User If Unique* declines (the account exists) and the only remaining
+branch is *Handle Existing Account*, which asks for email verification — no SMTP
+— or a password, which an invitee has never had. Both dead-end, and the reader
+sees an error instead of the site.
+
+```sh
+KC_REALM=docs-tx ./setup-first-broker-login.sh
+KC_REALM=docs-tx KC_FIRST_BROKER_LOGIN_FLOW="docs-tx first broker login" \
+  KC_IDP_TRUST_EMAIL=true ./setup-idp.sh google github
+```
+
+The script copies the built-in flow and makes two edits: *Handle Existing
+Account* → **DISABLED**, and `idp-auto-link` ("Automatically set existing user")
+added to *User creation or linking* as **ALTERNATIVE**, after *Create User If
+Unique*. The order is the point — auto-link consumes what create-if-unique
+declined. It is idempotent, and the result is execution-for-execution identical
+to the flow the live `docs-emr` realm carries.
+
+Creating the flow does not bind it: binding is per provider
+(`firstBrokerLoginFlowAlias`), which is why `setup-idp.sh` takes
+`KC_FIRST_BROKER_LOGIN_FLOW`. Run the flow script first.
+
 ## 4. Verifying without a browser
 
 A service account gives a real, signed token to test enforcement with — no
