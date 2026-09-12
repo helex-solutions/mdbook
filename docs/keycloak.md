@@ -192,14 +192,18 @@ which allows ten.
 
 ## 3b. Admitting a reader who was invited before they logged in
 
-The built-in `first broker login` flow assumes the federated identity is the
-first thing it has seen of a person. These realms work the other way round: a
-reader is **created by email and put in `mdbook-<role>` before they ever log
-in**, because the role is the invitation. When their identity then arrives,
-*Create User If Unique* declines (the account exists) and the only remaining
-branch is *Handle Existing Account*, which asks for email verification — no SMTP
-— or a password, which an invitee has never had. Both dead-end, and the reader
-sees an error instead of the site.
+A reader here is invited by being **created by email and put in
+`mdbook-<role>` before they ever log in** — the role is the invitation. They may
+then arrive through more than one provider: Google today, GitHub tomorrow.
+Keycloak matches those on email.
+
+The built-in `first broker login` flow asks the person to confirm that link, by
+email. These realms had no SMTP, so that path dead-ended, and the flow was
+edited to link **silently** instead — *Handle Existing Account* DISABLED plus
+`idp-auto-link`. Silent linking means whoever can make any provider assert an
+address owns the account at that address, roles included.
+
+With SMTP configured that trade is unnecessary, and the flow now confirms:
 
 ```sh
 KC_REALM=docs-tx ./setup-first-broker-login.sh
@@ -207,16 +211,36 @@ KC_REALM=docs-tx KC_FIRST_BROKER_LOGIN_FLOW="docs-tx first broker login" \
   KC_IDP_TRUST_EMAIL=true ./setup-idp.sh google github
 ```
 
-The script copies the built-in flow and makes two edits: *Handle Existing
-Account* → **DISABLED**, and `idp-auto-link` ("Automatically set existing user")
-added to *User creation or linking* as **ALTERNATIVE**, after *Create User If
-Unique*. The order is the point — auto-link consumes what create-if-unique
-declined. It is idempotent, and the result is execution-for-execution identical
-to the flow the live `docs-emr` realm carries.
+The script makes four edits to a copy of the built-in flow, and **all four
+matter**:
+
+1. *Create User If Unique* is raised **above** *Handle Existing Account*.
+   Alternatives run in index order; reversed, a brand-new reader is offered the
+   existing-account branch. (The live `docs-emr` flow had exactly this
+   inversion, harmless only because the branch was disabled.)
+2. *Handle Existing Account* → **ALTERNATIVE** — confirm, then verify by email.
+3. *Verify Existing Account by Re-authentication* → **DISABLED**. Its only
+   execution is a password form and nobody in these realms has a password; it is
+   a dead end a reader can pick by mistake.
+4. **`idp-auto-link` is removed.** This is the one that decides whether any of
+   the rest means anything: it sits as a later ALTERNATIVE, so a declined or
+   expired confirmation falls through and links anyway.
+
+> **SMTP is a hard prerequisite.** Bind this flow on a realm without a working
+> sender and every invitation dead-ends with no way back. The script warns when
+> `smtpServer` is empty; verify properly with
+> `POST /admin/realms/<realm>/testSMTPConnection`, which uses Keycloak's own
+> JVM and mail code.
 
 Creating the flow does not bind it: binding is per provider
 (`firstBrokerLoginFlowAlias`), which is why `setup-idp.sh` takes
 `KC_FIRST_BROKER_LOGIN_FLOW`. Run the flow script first.
+
+**What this does not do.** It never matches on `idp_sub`. Google's subject is a
+21-digit account id and GitHub's is the numeric GitHub user id — different
+namespaces, so equality across them is a coincidence, and merging on it would be
+an account-takeover primitive. Two accounts holding the same string are fine;
+`idp_sub` is a per-provider subject, not an identity.
 
 ## 4. Verifying without a browser
 

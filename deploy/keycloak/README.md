@@ -13,7 +13,7 @@ cp .env.sample .env      # fill in — .env is gitignored
 |---|---|
 | `setup-realm.sh` | realm, public client, roles, the roles claim mapper, one group per role, optional default role, optional test service account |
 | `setup-idp.sh`   | identity providers (`google`, `github`, or `all`) |
-| `setup-first-broker-login.sh` | a first-broker-login flow that admits a reader invited *before* their first login |
+| `setup-first-broker-login.sh` | a first-broker-login flow that **confirms by email** before linking a second provider to an existing account (needs realm SMTP) |
 | `setup-all.sh`   | realm + identity providers |
 | `lib.sh`         | `.env` loading, admin token, REST helpers |
 
