@@ -9,6 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 . "${SCRIPT_DIR}/lib.sh"
 
+export REALM
 preflight
 kc_login
 
@@ -19,12 +20,81 @@ echo "Site:     ${SITE_URL}"
 echo ""
 
 echo "Realm"
-ensure "realm ${REALM}" "/realms" "$(cat <<JSON
-{"realm":"${REALM}","enabled":true,"displayName":"${REALM}",
- "registrationAllowed":false,"loginWithEmailAllowed":true,
- "ssoSessionIdleTimeout":1800,"ssoSessionMaxLifespan":36000,"accessTokenLifespan":300}
-JSON
-)"
+# Realm-level settings this script OWNS. They are built here rather than left to
+# the admin console because `ensure` skips a realm that already exists — so
+# anything not in this body is silently absent from a rebuilt realm, and a realm
+# rebuilt without SMTP locks out every invited reader (the first-broker-login
+# flow confirms by email).
+#
+# Empty SMTP_HOST omits `smtpServer` entirely, so a realm that does not send
+# mail is unchanged by this.
+REALM_JSON=$(python3 - <<'PY'
+import json, os
+realm = os.environ["REALM"]
+body = {
+    "realm": realm, "enabled": True,
+    "displayName": os.environ.get("KC_REALM_DISPLAY_NAME") or realm,
+    "registrationAllowed": False, "loginWithEmailAllowed": True,
+    "ssoSessionIdleTimeout": 1800, "ssoSessionMaxLifespan": 36000,
+    "accessTokenLifespan": 300,
+}
+if os.environ.get("KC_LOGIN_THEME"):
+    body["loginTheme"] = os.environ["KC_LOGIN_THEME"]
+# Email as username: these realms federate to providers that all assert one, and
+# a reader should not be maintaining a separate handle.
+if os.environ.get("KC_EMAIL_AS_USERNAME", "").lower() == "true":
+    body["registrationEmailAsUsername"] = True
+    body["editUsernameAllowed"] = False
+host = os.environ.get("SMTP_HOST", "")
+if host:
+    smtp = {
+        "host": host,
+        "port": os.environ.get("SMTP_PORT", "587"),
+        "from": os.environ.get("SMTP_FROM", ""),
+        "fromDisplayName": os.environ.get("SMTP_FROM_DISPLAY_NAME") or body["displayName"],
+        "auth": os.environ.get("SMTP_AUTH", "false"),
+        "starttls": os.environ.get("SMTP_STARTTLS", "true"),
+        "ssl": os.environ.get("SMTP_SSL", "false"),
+    }
+    if os.environ.get("SMTP_REPLY_TO"): smtp["replyTo"] = os.environ["SMTP_REPLY_TO"]
+    if smtp["auth"].lower() == "true":
+        smtp["user"] = os.environ.get("SMTP_USERNAME", "")
+        smtp["password"] = os.environ.get("SMTP_PASSWORD", "")
+    body["smtpServer"] = smtp
+print(json.dumps(body))
+PY
+)
+export REALM_JSON
+
+ensure "realm ${REALM}" "/realms" "$REALM_JSON"
+
+# `ensure` leaves an EXISTING realm alone, which is right for everything it
+# creates but wrong for these settings: a realm provisioned before SMTP existed
+# would never gain it. Apply them to a realm that is already there, by reading
+# it and putting back only the fields above — anything set by hand elsewhere in
+# the realm survives.
+if [ "$API_STATUS" = "409" ]; then
+  CURRENT=$(api GET "/realms/${REALM}")
+  MERGED=$(printf '%s' "$CURRENT" | python3 -c '
+import json, sys, os
+cur = json.load(sys.stdin)
+own = json.loads(os.environ["REALM_JSON"])
+changed = [k for k, v in own.items() if k not in ("realm", "enabled") and cur.get(k) != v]
+cur.update({k: v for k, v in own.items() if k not in ("realm", "enabled")})
+print(json.dumps({"body": cur, "changed": changed}))
+')
+  CHANGED=$(printf '%s' "$MERGED" | python3 -c 'import json,sys; print(",".join(json.load(sys.stdin)["changed"]))')
+  if [ -n "$CHANGED" ]; then
+    api PUT "/realms/${REALM}" \
+        "$(printf '%s' "$MERGED" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["body"]))')" >/dev/null
+    case "$API_STATUS" in
+      200|204) echo "  updated  realm settings: ${CHANGED}" ;;
+      *)       die "update realm -> HTTP $API_STATUS" ;;
+    esac
+  else
+    echo "  ok       realm settings already match"
+  fi
+fi
 
 echo "Client"
 # The redirect URI is exactly the path `mdbook serve` listens on. A public

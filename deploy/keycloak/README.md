@@ -11,7 +11,7 @@ cp .env.sample .env      # fill in — .env is gitignored
 
 | Script | Does |
 |---|---|
-| `setup-realm.sh` | realm, public client, roles, the roles claim mapper, one group per role, optional default role, optional test service account |
+| `setup-realm.sh` | realm (incl. display name, login theme, email-as-username and **SMTP**), public client, roles, the roles claim mapper, one group per role, optional default role, optional test service account |
 | `setup-idp.sh`   | identity providers (`google`, `github`, or `all`) |
 | `setup-first-broker-login.sh` | a first-broker-login flow that **confirms by email** before linking a second provider to an existing account (needs realm SMTP) |
 | `setup-all.sh`   | realm + identity providers |
@@ -43,6 +43,13 @@ All variables live in [`.env.sample`](.env.sample). The ones that matter most:
 otherwise execute as a command, and a config file should never be able to run
 anything. Real environment variables take precedence over the file, so CI can
 supply secrets without writing one.
+
+**Realm settings are applied to an existing realm, not only a new one.**
+Everything else here is create-if-absent, but a realm provisioned before SMTP
+existed would otherwise never gain it — and a realm rebuilt *without* SMTP locks
+out every invited reader, because the first-broker-login flow confirms linking
+by email. The script reads the realm, puts back only the fields it owns, and
+names what it changed; anything set by hand elsewhere in the realm survives.
 
 `.env` holds secrets: it is gitignored, and worth `chmod 600`. Values must not
 carry a trailing `# comment` — the value is taken verbatim to the end of the line.
