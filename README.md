@@ -304,6 +304,13 @@ build:
 > still carrying it fails the build, naming the value to replace it with. Change
 > `source.format` to `owliki`; nothing else in the config changes.
 
+**`SUMMARY.md` dialects.** Both GitBook's and mdBook's `SUMMARY.md` are understood. The
+first `#` heading is the book title and is not shown. After it, a GitBook `## Group` heading and
+an mdBook `# Part` title each open a sidebar group, and bulleted entries nest by indent. mdBook's
+unbulleted prefix and suffix chapters — `[Introduction](README.md)` alone on a line — sit at the
+top level, outside any group. The one ambiguity is settled that way round: a file with no title
+line loses its first part heading, which is read as the title.
+
 **Plain doc trees (no `SUMMARY.md`).** With the `gitbook` format, `SUMMARY.md` is optional:
 point mdbook at any folder of markdown and it builds a **per-section sidebar automatically**
 from the directory tree (each top-level folder gets its own sidebar so pages stay small on

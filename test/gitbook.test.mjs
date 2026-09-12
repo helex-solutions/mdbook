@@ -170,3 +170,66 @@ test('gitbook ingest: sidebarTitle frontmatter overrides the H1 as the menu labe
     'a page without the override still falls back to its H1'
   )
 })
+
+// SUMMARY.md has two dialects. mdBook groups with `# Part` titles and allows
+// unbulleted prefix/suffix chapters; GitBook groups with `##`. Both drop the first `#`
+// heading as the book title. Reading only the GitBook half flattened every mdBook
+// sidebar into one undivided list and lost its Introduction link.
+const summaryOf = (files) => ingestGitbook(cfgFor(tmpGitbook(files))).sidebars.en
+
+test('gitbook ingest: mdBook part titles become sidebar groups', () => {
+  const sb = summaryOf({
+    'README.md': '# Docs\n',
+    'SUMMARY.md': [
+      '# Summary', '', '[Introduction](README.md)', '',
+      '# Manuals', '', '- [Deploy](deploy.md)', '  - [Plugins](plugins.md)', '',
+      '# Architecture', '', '- [Overview](arch.md)', '',
+      '---', '', '[Glossary](glossary.md)', ''
+    ].join('\n'),
+    'deploy.md': '# Deploy\n',
+    'plugins.md': '# Plugins\n',
+    'arch.md': '# Overview\n',
+    'glossary.md': '# Glossary\n'
+  })
+  assert.deepEqual(sb.map((i) => i.text), ['Introduction', 'Manuals', 'Architecture', 'Glossary'])
+  assert.ok(!JSON.stringify(sb).includes('"Summary"'), 'the book title is not a group')
+
+  const [intro, manuals, arch, glossary] = sb
+  assert.equal(intro.link, '/', 'an unbulleted prefix chapter is kept, at the top level')
+  assert.equal(manuals.link, undefined, 'a part title is a group, not a page')
+  assert.deepEqual(manuals.items.map((i) => i.link), ['/deploy'])
+  assert.deepEqual(manuals.items[0].items.map((i) => i.link), ['/plugins'], 'indent still nests inside a part')
+  assert.deepEqual(arch.items.map((i) => i.link), ['/arch'])
+  assert.equal(glossary.link, '/glossary', 'a suffix chapter after the last part stays top-level')
+  assert.equal(glossary.items, undefined)
+})
+
+test('gitbook ingest: a part title straight after the book title is still a group', () => {
+  // The case a "title is any # before the first entry" rule would silently drop.
+  const sb = summaryOf({
+    'README.md': '# Docs\n',
+    'SUMMARY.md': '# Summary\n\n# Manuals\n\n- [Deploy](deploy.md)\n',
+    'deploy.md': '# Deploy\n'
+  })
+  assert.equal(sb.length, 1)
+  assert.equal(sb[0].text, 'Manuals')
+  assert.deepEqual(sb[0].items.map((i) => i.link), ['/deploy'])
+})
+
+test('gitbook ingest: GitBook ## groups are unchanged, and its # title is still dropped', () => {
+  const sb = summaryOf({
+    'README.md': '# Portfolio\n',
+    'SUMMARY.md': [
+      '# Table of contents', '', '* [Summary](README.md)', '',
+      '## General', '', '* [Experience](experience.md)', '',
+      '## Services', '', '* [Overview](overview.md)', ''
+    ].join('\n'),
+    'experience.md': '# Experience\n',
+    'overview.md': '# Overview\n'
+  })
+  assert.deepEqual(sb.map((i) => i.text), ['Summary', 'General', 'Services'])
+  assert.ok(!JSON.stringify(sb).includes('Table of contents'), 'the book title is not a group')
+  assert.equal(sb[0].link, '/')
+  assert.deepEqual(sb[1].items.map((i) => i.link), ['/experience'])
+  assert.deepEqual(sb[2].items.map((i) => i.link), ['/overview'])
+})
