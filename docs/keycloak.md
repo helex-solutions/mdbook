@@ -38,6 +38,13 @@ listens on. A public client is correct: the code exchange happens server-side in
 `serve`, and PKCE is what protects it. (A confidential client also works; set
 `AUTH_OIDC_CLIENT_SECRET` on the container.)
 
+**The user profile is realm state too.** `setup-realm.sh` owns two parts of it,
+switched by `.env`: `KC_EMAIL_AS_USERNAME=true` makes email and username
+admin-only, and `KC_PERSONAL_IDENTIFIER` (`required` on `docs-tx`, `optional` on
+`docs-emr`) declares `personalIdentifier`. It reads the live profile and writes
+back only those declarations, so hand-added attributes survive and a re-run that
+changes nothing writes nothing.
+
 ## 2. Roles and the claim
 
 mdbook checks **role names**, so the token has to carry them. Create the roles on

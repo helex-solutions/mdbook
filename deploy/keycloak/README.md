@@ -11,7 +11,7 @@ cp .env.sample .env      # fill in — .env is gitignored
 
 | Script | Does |
 |---|---|
-| `setup-realm.sh` | realm (incl. display name, login theme, email-as-username and **SMTP**), public client, roles, the roles claim mapper, one group per role, optional default role, optional test service account |
+| `setup-realm.sh` | realm (incl. display name, login theme, email-as-username and **SMTP**), the parts of the **user profile** it owns, public client, roles, the roles claim mapper, one group per role, optional default role, optional test service account |
 | `setup-idp.sh`   | identity providers (`google`, `github`, or `all`) |
 | `setup-first-broker-login.sh` | a first-broker-login flow that **confirms by email** before linking a second provider to an existing account (needs realm SMTP) |
 | `setup-all.sh`   | realm + identity providers |
@@ -37,6 +37,8 @@ All variables live in [`.env.sample`](.env.sample). The ones that matter most:
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth client; a provider with no credentials is skipped, not half-created — so re-running without a secret never clobbers one already set |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub OAuth App, same skip-if-empty rule. **One App carries one callback URL**, so a second realm needs a second App |
 | `KC_FIRST_BROKER_LOGIN_FLOW` | flow bound to every provider; point it at what `setup-first-broker-login.sh` creates |
+| `KC_EMAIL_AS_USERNAME` | `true`: the email is the username, and both become admin-only in the user profile |
+| `KC_PERSONAL_IDENTIFIER` | `required`, `optional` or empty (not managed): declares `personalIdentifier` — country + national code in one value, pattern-validated, shown by the `helex` theme as two fields |
 | `KC_IDP_TRUST_EMAIL` | trust the address a provider returns as verified (`true` on the docs realms); marks a new reader's address verified, never skips the email confirmation for an existing account |
 
 `.env` is **parsed, not sourced** — an unquoted value containing spaces would

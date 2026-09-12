@@ -96,6 +96,94 @@ print(json.dumps({"body": cur, "changed": changed}))
   fi
 fi
 
+echo "User profile"
+# The declarative user profile is realm state too, and `ensure` never reaches it:
+# a rebuilt realm comes back with Keycloak's default attributes and nothing else.
+# These are the parts this script OWNS. They are applied by reading the live
+# profile and writing back only them, so every other attribute, validation and
+# annotation survives — and a profile that already matches is not written at all.
+#
+#   KC_EMAIL_AS_USERNAME=true  email and username become admin-only. The review
+#                              page then shows neither, which also keeps a reader
+#                              from skipping the link confirmation: Keycloak skips
+#                              it when either is changed there.
+#   KC_PERSONAL_IDENTIFIER     required | optional | empty (not managed). Declares
+#                              personalIdentifier — country + national code in one
+#                              value, as GovSSO issues it (EE39001010001) — which
+#                              the helex theme shows as a country select and a
+#                              code input.
+# `api` runs in a subshell here, so API_STATUS is not visible; the parser below
+# rejects anything that is not a profile instead.
+PROFILE=$(api GET "/realms/${REALM}/users/profile")
+PROFILE_PLAN=$(printf '%s' "$PROFILE" | python3 -c '
+import copy, json, os, sys
+try:
+    cur = json.load(sys.stdin)
+    assert isinstance(cur.get("attributes"), list)
+except Exception:
+    sys.exit("ERROR: could not read the user profile of this realm")
+new = copy.deepcopy(cur)
+attrs = new.setdefault("attributes", [])
+changed, managed = [], False
+
+def own(name, apply):
+    a = next((x for x in attrs if x.get("name") == name), None)
+    before = json.dumps(a, sort_keys=True)
+    if a is None:
+        a = {"name": name}
+        attrs.append(a)
+    apply(a)
+    if json.dumps(a, sort_keys=True) != before:
+        changed.append(name)
+
+if os.environ.get("KC_EMAIL_AS_USERNAME", "").lower() == "true":
+    managed = True
+    def admin_only(a):
+        a["permissions"] = {**a.get("permissions", {}), "edit": ["admin"]}
+    own("username", admin_only)
+    own("email", admin_only)
+
+mode = os.environ.get("KC_PERSONAL_IDENTIFIER", "").lower()
+if mode not in ("", "required", "optional"):
+    sys.exit("ERROR: KC_PERSONAL_IDENTIFIER must be required, optional or empty, not %r" % mode)
+if mode:
+    managed = True
+    def personal_identifier(a):
+        a["displayName"] = "${personalIdentifier}"
+        a["multivalued"] = False
+        a.setdefault("annotations", {}).update({
+            "helexWidget": "personal-identifier",
+            "inputHelperTextAfter": "${personalIdentifierHelp}",
+        })
+        # The reader fills it in on first login, so they may edit it.
+        a["permissions"] = {**a.get("permissions", {}), "edit": ["admin", "user"], "view": ["admin", "user"]}
+        # error-message is a bare message key; "${...}" would render literally.
+        a.setdefault("validations", {}).update({
+            "length": {"min": 5, "max": 64},
+            "pattern": {"pattern": "^[A-Z]{2}[A-Za-z0-9]{3,}$", "error-message": "personalIdentifierInvalid"},
+        })
+        if mode == "required":
+            a["required"] = {"roles": ["user"]}
+        else:
+            a.pop("required", None)
+    own("personalIdentifier", personal_identifier)
+
+print(json.dumps({"body": new, "changed": changed, "managed": managed}))
+')
+PROFILE_CHANGED=$(printf '%s' "$PROFILE_PLAN" | json_get '",".join(d["changed"])')
+if [ -n "$PROFILE_CHANGED" ]; then
+  api PUT "/realms/${REALM}/users/profile" \
+      "$(printf '%s' "$PROFILE_PLAN" | json_get 'json.dumps(d["body"])')" >/dev/null
+  case "$API_STATUS" in
+    200|204) echo "  updated  user profile: ${PROFILE_CHANGED}" ;;
+    *)       die "update user profile -> HTTP $API_STATUS" ;;
+  esac
+elif [ "$(printf '%s' "$PROFILE_PLAN" | json_get 'd["managed"]')" = "True" ]; then
+  echo "  ok       user profile already matches"
+else
+  echo "  skipped  user profile (KC_EMAIL_AS_USERNAME and KC_PERSONAL_IDENTIFIER unset)"
+fi
+
 echo "Client"
 # The redirect URI is exactly the path `mdbook serve` listens on. A public
 # client is right: the code exchange happens server-side in serve, and PKCE is
