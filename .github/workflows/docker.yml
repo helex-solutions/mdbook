@@ -94,19 +94,38 @@ jobs:
           #     these runners give the runner no passwordless sudo.
           # Owning the output as the runner makes both problems disappear, and no
           # chmod is needed since the runner already owns the checkout.
-          docker run -d --name smoke -p 8080:8080 -e MDBOOK_BUILD=1 \
+          #
+          # The container is detached, and the same persistence means nothing
+          # reaps it after the job — a hosted VM was thrown away, a self-hosted
+          # runner keeps it serving until the next run collides with its name
+          # and its port. Hence:
+          #   - a name per runner, removed up front: that also clears a
+          #     container leaked by a cancelled run, and runners sharing one
+          #     docker daemon never touch each other's;
+          #   - an EXIT trap, so both the exit 0 and the exit 1 below clean up;
+          #   - a loopback port docker picks, so a busy 8080 on a shared host
+          #     cannot fail the step.
+          # `smoke` is the fixed name runs before this change used and left
+          # behind; the line removing it can go once no runner holds one.
+          name="smoke-$RUNNER_NAME"
+          page="$RUNNER_TEMP/smoke-home.html"
+          docker rm -f smoke "$name" >/dev/null 2>&1 || true
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+          docker run -d --name "$name" -p 127.0.0.1::8080 -e MDBOOK_BUILD=1 \
             --user "$(id -u):$(id -g)" \
             -v "$PWD/demo:/site" mdbook:smoke
+          port=$(docker port "$name" 8080/tcp | head -n1)
+          port=${port##*:}
           for _ in $(seq 60); do
-            if curl -fsS -o /tmp/home.html http://127.0.0.1:8080/ && grep -qi '<title' /tmp/home.html; then
-              echo "served: $(grep -o '<title>[^<]*' /tmp/home.html)"
+            if curl -fsS -o "$page" "http://127.0.0.1:$port/" && grep -qi '<title' "$page"; then
+              echo "served: $(grep -o '<title>[^<]*' "$page")"
               exit 0
             fi
-            [ "$(docker inspect -f '{{.State.Running}}' smoke)" = true ] || break
+            [ "$(docker inspect -f '{{.State.Running}}' "$name")" = true ] || break
             sleep 2
           done
           echo '::error::the container never served the demo site'
-          docker logs smoke
+          docker logs "$name"
           exit 1
 
       - name: Log in to ghcr.io
