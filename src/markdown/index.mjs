@@ -10,6 +10,7 @@ import sup from 'markdown-it-sup'
 import footnote from 'markdown-it-footnote'
 import taskLists from 'markdown-it-task-lists'
 import { owlikiLinks, mountFromPath } from './owliki-links.mjs'
+import { readmeLinks } from './readme-links.mjs'
 import { owlikiImages } from './owliki-images.mjs'
 import { owlikiEmbeds } from './owliki-embeds.mjs'
 import { collapsible } from './collapsible.mjs'
@@ -65,6 +66,7 @@ export function applyMarkdown(md, opts = {}) {
   md.use(diagrams, opts) // ```drawio ```plantuml ```mermaid
   md.use(codeCitation) // ```43:58:path/File.java -> highlighted java + a file caption
   md.use(owlikiLinks, opts) // [t](page:slug) [t](cs:code) [t](vs:code) [t](concept:cs|code)
+  md.use(readmeLinks) // [t](x/README.md) -> the folder page, not a missing x/README
   md.use(owlikiImages, opts) // ![](files/<pageId>/<file>)
 
   for (const p of opts.extraPlugins || []) md.use(p, opts)
@@ -79,4 +81,4 @@ export function applyMarkdown(md, opts = {}) {
   }
 }
 
-export { owlikiLinks, owlikiImages, mountFromPath, collapsible, cardGrid }
+export { owlikiLinks, owlikiImages, readmeLinks, mountFromPath, collapsible, cardGrid }

@@ -315,7 +315,11 @@ line loses its first part heading, which is read as the title.
 point mdbook at any folder of markdown and it builds a **per-section sidebar automatically**
 from the directory tree (each top-level folder gets its own sidebar so pages stay small on
 large repos). Folder labels come from a `README.md` H1 (else the folder name); page labels
-from each file's first H1; entries sort naturally (`01-…` before `10-…`). Add a `SUMMARY.md`
+from each file's first H1 (a `sidebarTitle` frontmatter overrides either). Folders come first, by label.
+Pages whose file name leads with a number or a spec ID (`01-overview.md`, `TEDY.01-code-system.md`)
+follow in file-name order (`01-…` before `10-…`), then the rest by label; a spec with a sub-number
+(`TEDY.01.1-…`) nests under its parent page (`TEDY.01-…`) in the same folder. A link to a folder's
+`README.md` reaches the folder's page. Add a `SUMMARY.md`
 later to take manual control of the nav. Arbitrary markdown is also **hardened** for the Vue
 compiler — a stray `<Placeholder>`/`</tag>` or `{{ … }}` in prose (common in API specs) is
 escaped instead of crashing the build; real HTML, autolinks and code are left intact.

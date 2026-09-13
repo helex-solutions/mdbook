@@ -75,3 +75,22 @@ test('cardGrid: a plain list without {.card-grid} is untouched', () => {
   assert.match(out, /<ul>/, 'ordinary list is left alone')
   assert.doesNotMatch(out, /mdbook-cards/, 'no card grid produced')
 })
+
+// A link written the way a repository reads — x/README.md — must reach the folder page. Staging
+// publishes README.md as index.md, and VitePress turns only index.md into the folder URL, so the
+// renderer hands it the staged name. Without this, x/README.md rendered as a missing x/README.
+test('readmeLinks: a link to a README.md targets the staged index.md', () => {
+  const href = (src) => render(src).match(/href="([^"]*)"/)[1]
+  assert.equal(href('[m](manuals/README.md)'), 'manuals/index.md')
+  assert.equal(href('[up](../README.md#part)'), '../index.md#part', 'the anchor is kept')
+  assert.equal(href('[here](README.md)'), 'index.md')
+  assert.equal(href('[abs](/specs/tedy/README.md)'), '/specs/tedy/index.md')
+})
+
+test('readmeLinks: other links are left alone', () => {
+  const href = (src) => render(src).match(/href="([^"]*)"/)[1]
+  assert.equal(href('[ext](https://github.com/o/r/blob/main/README.md)'), 'https://github.com/o/r/blob/main/README.md')
+  assert.equal(href('[page](other.md)'), 'other.md')
+  assert.equal(href('[near](READMEs.md)'), 'READMEs.md')
+  assert.equal(href('[folder](manuals/)'), 'manuals/')
+})

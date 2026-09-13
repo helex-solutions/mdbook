@@ -174,8 +174,9 @@ function ingestOne({
   for (const abs of files) {
     const rel = path.relative(dir, abs)
     // A README is a folder's index at ANY depth (root README -> index.md,
-    // docs/README.md -> docs/index.md), so `/docs/` resolves to a real page —
-    // this is what toLink() and the link rewriter already assume.
+    // docs/README.md -> docs/index.md), so `/docs/` resolves to a real page.
+    // toLink() relies on this for SUMMARY.md links, and markdown/readme-links.mjs
+    // points content links written `x/README.md` at the same page.
     const dest = rel.replace(/(^|[\\/])README\.md$/i, (m, sep) => `${sep}index.md`)
     taken.add(destPrefix + dest.split(path.sep).join('/'))
     contentFiles.push({ src: abs, dest: destPrefix + dest, lang })
@@ -299,15 +300,64 @@ const readmeIn = (d, withPdf = true) =>
     .map((r) => path.join(d, r))
     .find((p) => fs.existsSync(p))
 
-// Folders sort before files, each alphabetically (natural order) by their visible
-// label. Icons are applied only after sorting so the markup can't affect order.
+// A page's file name, from its link — the only place an item still carries it.
+const stemOf = (item) => decodeURIComponent(String(item.link || '').split('/').pop())
+
+// A page whose file name leads with a number (`01-overview`) or a spec ID
+// (`TEDY.01-code-system`) was numbered on purpose, so the number decides where it
+// goes. Its label cannot: labels are written to read well, not to sort, so ordering a
+// numbered folder by label scrambles the sequence its author chose.
+const NUMBERED_RE = /^(?:\d+[-_.]|[A-Z][A-Z0-9]*\.\d)/
+
+// The full ID a spec page leads with — TEDY.01, TEDY.01.1, TEDY.01.1.2 …
+const SPEC_ID_RE = /^([A-Z][A-Z0-9]*(?:\.\d+)+)-/
+
+// Numbered pages first, in file-name order; every other page after them, by label.
+function sortPages(files) {
+  const numbered = files.filter((f) => NUMBERED_RE.test(stemOf(f)))
+  const rest = files.filter((f) => !NUMBERED_RE.test(stemOf(f)))
+  numbered.sort((a, b) => naturalCmp(stemOf(a), stemOf(b)))
+  rest.sort((a, b) => naturalCmp(a.text, b.text))
+  return [...numbered, ...rest]
+}
+
+// Spec families nest. A page whose ID has a sub-number (TEDY.01.1) goes under the
+// page carrying its parent ID (TEDY.01) in the same folder, at any depth. The files
+// stay flat on disk — the layout the specifications are written in and are moved
+// between repositories in — so only the menu learns the family. A child whose
+// parent has no page of its own stays at the top level rather than disappearing.
+function nestFamilies(pages) {
+  const byId = new Map()
+  for (const p of pages) {
+    const m = stemOf(p).match(SPEC_ID_RE)
+    if (m) byId.set(m[1], p)
+  }
+  const top = []
+  for (const p of pages) {
+    const id = stemOf(p).match(SPEC_ID_RE)?.[1]
+    const parts = id ? id.split('.') : []
+    const parent = parts.length > 2 ? byId.get(parts.slice(0, -1).join('.')) : null
+    if (parent) (parent.items ||= []).push(p)
+    else top.push(p)
+  }
+  return top
+}
+
+// Folders sort before pages, folders by label. Pages follow sortPages and nest into
+// their spec families. Icons are applied only after ordering, so the markup cannot
+// affect it; items already built by a deeper call carry no `icon` key and pass through.
 function orderAndIcon(folders, files) {
-  const byText = (a, b) => naturalCmp(a.text, b.text)
-  folders.sort(byText)
-  files.sort(byText)
-  return [...folders, ...files].map(({ icon, ...rest }) =>
-    icon ? { ...rest, text: icon + rest.text } : rest
-  )
+  folders.sort((a, b) => naturalCmp(a.text, b.text))
+  const pages = nestFamilies(sortPages(files))
+  const withIcon = ({ icon, items, ...rest }) => {
+    const out = icon ? { ...rest, text: icon + rest.text } : { ...rest }
+    if (items) {
+      out.items = items.map(withIcon)
+      if (!('collapsed' in out)) out.collapsed = true
+    }
+    return out
+  }
+  return [...folders, ...pages].map(withIcon)
 }
 
 // A folder's label and icon come from its README (`sidebarTitle` > H1, and its
