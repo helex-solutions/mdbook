@@ -105,11 +105,9 @@ jobs:
           #   - an EXIT trap, so both the exit 0 and the exit 1 below clean up;
           #   - a loopback port docker picks, so a busy 8080 on a shared host
           #     cannot fail the step.
-          # `smoke` is the fixed name runs before this change used and left
-          # behind; the line removing it can go once no runner holds one.
           name="smoke-$RUNNER_NAME"
           page="$RUNNER_TEMP/smoke-home.html"
-          docker rm -f smoke "$name" >/dev/null 2>&1 || true
+          docker rm -f "$name" >/dev/null 2>&1 || true
           trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
           docker run -d --name "$name" -p 127.0.0.1::8080 -e MDBOOK_BUILD=1 \
             --user "$(id -u):$(id -g)" \
