@@ -184,6 +184,61 @@ else
   echo "  skipped  user profile (KC_EMAIL_AS_USERNAME and KC_PERSONAL_IDENTIFIER unset)"
 fi
 
+echo "Events"
+# Saved user events are the only record of a successful login or account link:
+# Keycloak's log listener writes those at DEBUG, so the container log shows
+# failures only. Owned here, like the user profile, so a rebuilt realm keeps it.
+#
+#   KC_SAVE_EVENTS             true | false | empty (not managed)
+#   KC_EVENTS_EXPIRATION_DAYS  how long saved events are kept (default 90;
+#                              0 keeps them forever). Events carry IP addresses,
+#                              so an expiry is the default, not an option.
+#
+# Only eventsEnabled and eventsExpiration are written; listeners, event types
+# and admin-event settings stay as found, and a config that matches is not
+# written at all.
+EVENTS_PLAN=$(api GET "/realms/${REALM}/events/config" | python3 -c '
+import json, os, sys
+save = os.environ.get("KC_SAVE_EVENTS", "").lower()
+if save not in ("", "true", "false"):
+    sys.exit("ERROR: KC_SAVE_EVENTS must be true, false or empty, not %r" % save)
+if not save:
+    print(json.dumps({"managed": False, "changed": []}))
+    sys.exit()
+days = os.environ.get("KC_EVENTS_EXPIRATION_DAYS") or "90"
+if not days.isdigit():
+    sys.exit("ERROR: KC_EVENTS_EXPIRATION_DAYS must be a whole number of days, not %r" % days)
+try:
+    cur = json.load(sys.stdin)
+    assert isinstance(cur, dict) and "eventsEnabled" in cur
+except Exception:
+    sys.exit("ERROR: could not read the events config of this realm")
+changed = []
+if bool(cur.get("eventsEnabled")) != (save == "true"):
+    cur["eventsEnabled"] = save == "true"
+    changed.append("eventsEnabled")
+if save == "true":
+    # Keycloak reports an unset expiry as absent and clears it with 0.
+    expiry = int(days) * 86400
+    if (cur.get("eventsExpiration") or 0) != expiry:
+        cur["eventsExpiration"] = expiry
+        changed.append("eventsExpiration=%sd" % days)
+print(json.dumps({"managed": True, "changed": changed, "body": cur}))
+')
+EVENTS_CHANGED=$(printf '%s' "$EVENTS_PLAN" | json_get '",".join(d["changed"])')
+if [ -n "$EVENTS_CHANGED" ]; then
+  api PUT "/realms/${REALM}/events/config" \
+      "$(printf '%s' "$EVENTS_PLAN" | json_get 'json.dumps(d["body"])')" >/dev/null
+  case "$API_STATUS" in
+    200|204) echo "  updated  events: ${EVENTS_CHANGED}" ;;
+    *)       die "update events config -> HTTP $API_STATUS" ;;
+  esac
+elif [ "$(printf '%s' "$EVENTS_PLAN" | json_get 'd["managed"]')" = "True" ]; then
+  echo "  ok       events already match"
+else
+  echo "  skipped  events (KC_SAVE_EVENTS unset)"
+fi
+
 echo "Client"
 # The redirect URI is exactly the path `mdbook serve` listens on. A public
 # client is right: the code exchange happens server-side in serve, and PKCE is

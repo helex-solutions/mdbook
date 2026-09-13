@@ -45,6 +45,12 @@ admin-only, and `KC_PERSONAL_IDENTIFIER` (`required` on `docs-tx`, `optional` on
 back only those declarations, so hand-added attributes survive and a re-run that
 changes nothing writes nothing.
 
+**Saved events** are owned the same way. Keycloak's log listener writes a
+successful login or account link at DEBUG, so the container log only ever shows
+failures; `KC_SAVE_EVENTS=true` keeps them in the realm (*Events → User events*
+in the console) for `KC_EVENTS_EXPIRATION_DAYS`, 90 by default — they carry IP
+addresses, so they expire. Both docs realms save events.
+
 ## 2. Roles and the claim
 
 mdbook checks **role names**, so the token has to carry them. Create the roles on

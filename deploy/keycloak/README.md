@@ -39,6 +39,8 @@ All variables live in [`.env.sample`](.env.sample). The ones that matter most:
 | `KC_FIRST_BROKER_LOGIN_FLOW` | flow bound to every provider; point it at what `setup-first-broker-login.sh` creates |
 | `KC_EMAIL_AS_USERNAME` | `true`: the email is the username, and both become admin-only in the user profile |
 | `KC_PERSONAL_IDENTIFIER` | `required`, `optional` or empty (not managed): declares `personalIdentifier` — country + national code in one value, pattern-validated, shown by the `helex` theme as two fields |
+| `KC_SAVE_EVENTS` | `true`/`false`, empty = not managed: save user events (logins, links, errors) — the log shows failures only |
+| `KC_EVENTS_EXPIRATION_DAYS` | how long saved events are kept; default `90`, `0` = forever |
 | `KC_IDP_TRUST_EMAIL` | trust the address a provider returns as verified (`true` on the docs realms); marks a new reader's address verified, never skips the email confirmation for an existing account |
 
 `.env` is **parsed, not sourced** — an unquoted value containing spaces would
