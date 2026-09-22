@@ -5,5 +5,6 @@
   - [Smart text](guide/smart-text.md)
   - [Diagrams](guide/diagrams.md)
   - [Code](guide/code.md)
+  - [Wide table](guide/wide-table.md)
 - [Internal](internal/README.md)
   - [Team notes](internal/notes.md)

@@ -19,3 +19,21 @@ services:
       # AUTH_OIDC_CLIENT_ID: owlexicon
       # AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET}
       TZ: UTC
+      # PDF export talks to the md2pdf service below. It is named in
+      # .mdbook/config.yml (`pdf.server: http://md2pdf:18509`); naming it is
+      # what enables the feature.
+      # MD2PDF_TOKEN: ${MD2PDF_TOKEN}
+
+  # Optional — only needed for PDF export (README "PDF export").
+  # Its own image because a PDF needs a layout engine: this one carries Chromium
+  # and the Noto/DejaVu fonts, which the docs image deliberately does not.
+  md2pdf:
+    image: ghcr.io/helex-solutions/md2pdf:latest
+    container_name: mdbook-md2pdf
+    restart: unless-stopped
+    # NO published port. Only `docs` needs to reach it, over the compose network,
+    # and the renderer should not be on the internet.
+    environment:
+      # MD2PDF_TOKEN: ${MD2PDF_TOKEN}   # require a bearer token
+      MD2PDF_CONCURRENCY: "2"           # renders in flight; the rest queue
+      TZ: UTC
