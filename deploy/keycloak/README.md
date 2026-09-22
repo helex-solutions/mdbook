@@ -15,7 +15,6 @@ cp .env.sample .env      # fill in — .env is gitignored
 | `setup-idp.sh`   | identity providers (`google`, `github`, or `all`) |
 | `setup-first-broker-login.sh` | a first-broker-login flow that **confirms by email** before linking a second provider to an existing account (needs realm SMTP) |
 | `setup-all.sh`   | realm + identity providers |
-| `setup-readers.sh` | readers from a TSV list — user, identity-provider links (keyed on the provider's id, so login skips first-broker-login), groups; additive, re-runnable, so a rebuilt realm gets its readers back |
 | `lib.sh`         | `.env` loading, admin token, REST helpers |
 
 Everything is **re-runnable**: existing objects are reported and left alone, so
