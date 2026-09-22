@@ -172,6 +172,21 @@ nothing at all.
 git tag -a v1.9.1 -m "…" && git push origin v1.9.1   # patch; v1.10.0 for features
 ```
 
+Pushing the tag publishes the Docker image: `ghcr.io/helex-solutions/mdbook:1.9.1`, and
+`:latest` as well because that is a plain release number. A pre-release (`v2.0.0-rc1`) publishes
+its own tag and leaves `:latest` alone, so nobody gets a release candidate from an untagged pull.
+The *Docker image* workflow is still dispatchable by hand for a one-off build from a branch.
+
+Two things the tag push cannot do for you:
+
+- **Check the tag is on `main` before pushing it** — `git merge-base --is-ancestor v1.9.1 origin/main`.
+  A tag on a commit that a force-push has since orphaned still builds, and produces an image of a
+  tree the repository no longer has. That has happened.
+- **Make a brand-new package public.** The first publish of a repository's image creates a
+  *private* GHCR package, whatever the repository's own visibility, and the registry answers
+  `unauthorized` rather than "not found" — which reads like a broken login. Flip it once, in the
+  package's settings, and every later publish inherits it.
+
 Then bump `@v1.9.0` → `@v1.9.1` in each consumer's `.github/workflows/mdbook.yml` and push —
 a deliberate step, so upgrades are reviewed rather than automatic.
 
