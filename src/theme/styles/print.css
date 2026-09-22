@@ -1,0 +1,274 @@
+/* Paged media — used twice, deliberately.
+ *
+ *   1. by Chromium inside md2pdf, for `GET {base}pdf`;
+ *   2. by a reader pressing Ctrl-P on the live site.
+ *
+ * One stylesheet for both is the same rule the rest of the export follows: what
+ * a reader reads and what gets filed cannot diverge (docs/pdf-design.md). It
+ * also means a site with no md2pdf still prints properly, which is most sites.
+ *
+ * The break rules below are carried over from the paged-media stylesheets in
+ * ~/bin/md2pdf-*.css, which have been through real documents.
+ */
+
+@media print {
+  /* Margins only — deliberately NO `size`.
+     Two reasons, and the first is a bug this cost:
+       - `@page { size: A4 }` OVERRIDES Chromium's own paper settings, so a page
+         asking for landscape via `pdf.orientation` (or `pdf.format: Letter`)
+         came out portrait A4 anyway, silently;
+       - for a reader pressing Ctrl-P, the paper is theirs to choose. Forcing A4
+         on someone printing to Letter is wrong.
+     md2pdf therefore owns the page box; this owns the margins inside it. */
+  @page {
+    margin: 18mm 16mm 20mm 16mm;
+  }
+
+  /* Print the light palette whatever the reader is viewing in: white-on-black
+     wastes toner and reads badly, and a filed document should look the same
+     whoever produced it. */
+  :root,
+  html.dark {
+    color-scheme: light !important;
+  }
+
+  /* --- chrome off ------------------------------------------------------- */
+  .VPNav,
+  .VPSidebar,
+  .VPLocalNav,
+  .VPDocAside,
+  .VPDocFooter,
+  .VPSkipLink,
+  .VPBackdrop,
+  .VPFooter,
+  .mdbook-breadcrumbs,
+  .mdbook-present-ui,
+  .mdbook-pdf-ui,
+  .mdbook-zoom,
+  .mdbook-auth,
+  .mdbook-comments,
+  .mdbook-op-filter,
+  .mdbook-tryit,
+  .mdbook-file-actions,
+  .mdbook-pdf-frame,
+  .header-anchor,
+  .copy,
+  .lang,
+  button {
+    display: none !important;
+  }
+
+  /* --- article full width ----------------------------------------------- */
+  .VPDoc,
+  .VPDoc .container,
+  .VPDoc .content,
+  .VPDoc .content-container,
+  .VPContent,
+  .Layout {
+    display: block !important;
+    max-width: none !important;
+    width: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .vp-doc {
+    /* The nav-bar zoom control must not scale a printed page. */
+    zoom: 1 !important;
+    font-size: 10pt;
+    line-height: 1.45;
+  }
+
+  body {
+    background: #fff !important;
+    color: #1a1a1a !important;
+  }
+
+  /* --- breaks ------------------------------------------------------------ */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    break-after: avoid;
+    page-break-after: avoid;
+    color: #111 !important;
+  }
+  h1 + *,
+  h2 + *,
+  h3 + * {
+    break-before: avoid;
+    page-break-before: avoid;
+  }
+  p,
+  li {
+    orphans: 3;
+    widows: 3;
+  }
+  pre,
+  blockquote,
+  figure,
+  .mdbook-drawio,
+  .mermaid-diagram,
+  .custom-block,
+  .mdbook-file {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* A long table flows across pages with its header repeated; a row is never
+     split. A table that fits stays whole because its rows do. */
+  table {
+    break-inside: auto;
+    page-break-inside: auto;
+    width: 100%;
+    font-size: 9pt;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr,
+  th,
+  td {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  th,
+  td {
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+  }
+
+  /* --- content that must not be clipped ---------------------------------- */
+  /* A code line cut off at the page edge has LOST text; wrapping keeps it. */
+  pre,
+  pre code {
+    white-space: pre-wrap !important;
+    word-break: break-word;
+    overflow: visible !important;
+    font-size: 8.5pt;
+  }
+  .vp-doc div[class*='language-'] {
+    overflow: visible !important;
+  }
+  img,
+  svg,
+  .mermaid-diagram svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+  /* A closed section would otherwise be missing from the document entirely. */
+  details > *,
+  .mdbook-op > *:not(summary) {
+    display: block !important;
+  }
+
+  /* --- links ------------------------------------------------------------- */
+  a {
+    color: inherit !important;
+    text-decoration: none;
+  }
+  /* Paper cannot be clicked, so an external link prints where it goes. Internal
+     links, anchors and links whose text already IS the URL are left alone — the
+     URL twice is noise. */
+  .vp-doc a[href^='http']:not([href*='javascript'])::after {
+    content: ' (' attr(href) ')';
+    font-size: 0.85em;
+    color: #555;
+    word-break: break-all;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * The document md2pdf receives (<body class="mdbook-pdf">). These rules are NOT
+ * inside @media print: the renderer prints with print emulation on, but the
+ * cover and contents pages exist only in that document, so they are styled
+ * unconditionally and simply never appear on the site.
+ * ------------------------------------------------------------------------ */
+
+body.mdbook-pdf {
+  background: #fff;
+  color: #1a1a1a;
+  margin: 0;
+}
+body.mdbook-pdf .vp-doc {
+  max-width: none;
+  padding: 0;
+}
+
+.mdbook-pdf-cover {
+  break-after: page;
+  page-break-after: always;
+  padding-top: 60mm;
+  text-align: center;
+}
+.mdbook-pdf-cover h1 {
+  font-size: 26pt;
+  margin: 0 0 6mm;
+  border: 0;
+  padding: 0;
+}
+.mdbook-pdf-site {
+  font-size: 12pt;
+  color: #555;
+  margin: 0;
+}
+.mdbook-pdf-date {
+  font-size: 10pt;
+  color: #777;
+  margin-top: 4mm;
+}
+
+.mdbook-pdf-toc {
+  break-after: page;
+  page-break-after: always;
+}
+.mdbook-pdf-toc h2 {
+  font-size: 15pt;
+  margin: 0 0 6mm;
+}
+.mdbook-pdf-toc ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 10pt;
+}
+.mdbook-pdf-toc li {
+  padding: 1.2mm 0;
+  break-inside: avoid;
+}
+.mdbook-pdf-toc .toc-l1 {
+  font-weight: 600;
+  margin-top: 3mm;
+}
+.mdbook-pdf-toc .toc-l2 {
+  padding-left: 8mm;
+}
+.mdbook-pdf-toc .toc-l3 {
+  padding-left: 16mm;
+  color: #444;
+}
+
+/* Each page starts a new leaf in a book export — except the first, which would
+   otherwise leave a blank page after the contents. */
+.mdbook-pdf-section {
+  break-before: page;
+  page-break-before: always;
+}
+.mdbook-pdf .vp-doc > .mdbook-pdf-section:first-child {
+  break-before: auto;
+  page-break-before: auto;
+}
+
+.mdbook-pdf-omitted {
+  break-before: page;
+  page-break-before: always;
+  color: #555;
+  font-size: 10pt;
+}
+.mdbook-pdf-missing {
+  color: #999;
+  font-size: 0.9em;
+  font-style: italic;
+}

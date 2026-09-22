@@ -10,11 +10,13 @@ import Footer from './footer.mjs'
 import Breadcrumbs from './breadcrumbs.mjs'
 import Related from './related.mjs'
 import Zoom from './zoom.mjs'
+import Pdf from './pdf.mjs'
 import OpenApi from './openapi.mjs'
 import Auth from './auth.mjs'
 import { renderMermaid } from './mermaid.mjs'
 import './styles/base.css'
 import './styles/smart-text.css'
+import './styles/print.css'
 
 // Mark the .links-list row whose link points at the current page as current.
 function markCurrentLink() {
@@ -36,7 +38,7 @@ export default {
   // presentation-mode controls once per layout.
   Layout: () =>
     h(DefaultTheme.Layout, null, {
-      'nav-bar-content-after': () => [h(Zoom), h(Auth)],
+      'nav-bar-content-after': () => [h(Zoom), h(Pdf), h(Auth)],
       'doc-before': () => h(Breadcrumbs),
       'doc-after': () => [h(Related), h(Comments)],
       'layout-bottom': () => [h(Footer), h(Present), h(OpenApi)]
