@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { modelFromDocument, authFromSchemes, expandEnv, effectiveServers } from '../src/ingest/openapi.mjs'
+import { modelFromDocument, authFromSchemes, expandEnv, effectiveServers, resolverCause, withRetries, maskUrls } from '../src/ingest/openapi.mjs'
 import { expandOpenapi, parseAttrs, typeOf, selectOperations, sortOperations } from '../src/ingest/openapi-render.mjs'
 
 const DOC = {
@@ -233,4 +233,95 @@ test('expandOpenapi: operations render sorted by default', () => {
   const out = expandOpenapi('{% openapi src="petstore" tag="Pets" %}', specs, { tryIt: false })
   const order = [...out.matchAll(/^### `(\w+)` `([^`]+)`/gm)].map((m) => `${m[1]} ${m[2]}`)
   assert.deepEqual(order, ['GET /pets', 'POST /pets'])
+})
+
+// --- resolverCause / withRetries -------------------------------------------
+// A spec that fails to load used to report `Error reading file "<url>"` and
+// nothing else, because json-schema-ref-parser wraps the plugin failure in an
+// object with no `message` of its own.
+
+test('resolverCause: digs the real reason out of the parser wrapper', () => {
+  const inner = new Error('Error downloading https://api.example.com/spec: HTTP ERROR 502')
+  const wrapper = Object.assign(new Error('Error reading file "https://api.example.com/spec"'), {
+    error: { plugin: 'http', error: inner }
+  })
+  assert.equal(resolverCause(wrapper), inner.message, 'the HTTP status survives, not the generic text')
+})
+
+test('resolverCause: follows cause and errors[], and never returns the generic text alone', () => {
+  const viaCause = Object.assign(new Error('Error reading file "x"'), { cause: new Error('fetch failed') })
+  assert.equal(resolverCause(viaCause), 'fetch failed')
+  const viaList = Object.assign(new Error('Error reading file "x"'), { errors: [new Error('ECONNRESET')] })
+  assert.equal(resolverCause(viaList), 'ECONNRESET')
+  assert.equal(resolverCause(new Error('plain failure')), 'plain failure', 'an ordinary error is passed through')
+  assert.equal(resolverCause(new Error('Error reading file "x"')), 'Error reading file "x"',
+    'with nothing wrapped there is nothing better to say')
+  assert.equal(resolverCause(null), 'unknown error')
+})
+
+test('resolverCause: a cycle between wrapper and cause terminates', () => {
+  const a = new Error('Error reading file "x"')
+  const b = new Error('Error reading file "y"')
+  a.cause = b
+  b.cause = a
+  assert.equal(typeof resolverCause(a), 'string')
+})
+
+test('withRetries: a transient failure is retried and the value returned', async () => {
+  let calls = 0
+  const seen = []
+  const value = await withRetries(
+    async () => {
+      calls += 1
+      if (calls < 3) throw new Error('HTTP ERROR 502')
+      return 'spec'
+    },
+    { attempts: 3, delayMs: 0, onRetry: (attempt) => seen.push(attempt) }
+  )
+  assert.equal(value, 'spec')
+  assert.equal(calls, 3, 'tried until it worked')
+  assert.deepEqual(seen, [1, 2], 'one notice per retry, none for the attempt that succeeded')
+})
+
+test('withRetries: gives up after the configured attempts and throws the last error', async () => {
+  let calls = 0
+  await assert.rejects(
+    () => withRetries(async () => { calls += 1; throw new Error(`fail ${calls}`) }, { attempts: 2, delayMs: 0 }),
+    /fail 2/
+  )
+  assert.equal(calls, 2, 'attempts is a count of tries, not of retries after the first')
+})
+
+test('withRetries: a missing environment variable is not retried', async () => {
+  let calls = 0
+  await assert.rejects(
+    () => withRetries(
+      async () => {
+        calls += 1
+        throw Object.assign(new Error('environment variable(s) not set: TOKEN'), { missingEnv: true })
+      },
+      { attempts: 3, delayMs: 0 }
+    ),
+    /TOKEN/
+  )
+  assert.equal(calls, 1, 'asking again cannot set an environment variable')
+})
+
+test('maskUrls: groups by problem, keeping the punctuation around the URL', () => {
+  assert.equal(
+    maskUrls('Error downloading https://api.example.com/spec: HTTP ERROR 502'),
+    'Error downloading the service: HTTP ERROR 502',
+    'the colon introducing the status survives'
+  )
+  assert.equal(
+    maskUrls('Error reading file "https://api.example.com/spec"'),
+    'Error reading file "the service"',
+    'the closing quote survives — it used to be eaten with the URL'
+  )
+  assert.equal(
+    maskUrls('tried https://a.example.com/s and http://b.example.com/s'),
+    'tried the service and the service',
+    'every URL in the line is masked, so two hosts still group as one problem'
+  )
+  assert.equal(maskUrls('no url here'), 'no url here')
 })

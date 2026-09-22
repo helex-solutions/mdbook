@@ -224,6 +224,7 @@ openapi:
     petstore: ./api/petstore.yaml
   sort: path                   # source (default) | path | summary
   tryIt: true                  # interactive console (default: true)
+  retries: 3                   # attempts per URL source (default: 3; 1 = no retry)
   auth:                        # only what an OpenAPI document cannot declare
     clientId: docs-portal
     scopes: [openid, profile]
@@ -458,6 +459,19 @@ Documents are read **at build time**, not in the browser. That means the site wo
 air-gapped network, the docs are pinned to the spec they were built from, and — unlike a
 client-side viewer — your API does **not** need to allow CORS from the docs site. A resolved
 document is cached, so a later build still succeeds if a remote spec is briefly unreachable.
+
+A URL source is fetched up to three times before that cached copy is used, because the
+documents are served by live services and a restart or a proxy hiccup makes one attempt fail
+and the next succeed — publishing a stale API reference over a blip that lasted a second. Set
+`openapi.retries` to change the count (`1` disables retrying). A local file and a missing
+`${VAR}` are never retried: neither heals by asking again. Each failed attempt is logged with
+the reason it failed, and when every attempt fails the reason is reported with the spec.
+
+> **Localhost is refused.** The resolver rejects `localhost`, `127.0.0.1`, RFC1918 addresses
+> and `.local` / `.internal` / `.corp` hostnames as unsafe, so a spec URL pointing at a
+> development server on the same machine never loads — it fails with
+> `Unable to resolve $ref pointer`, before any request is made. Use a file path for a local
+> document.
 
 ### Embedding — from whole document to one operation
 

@@ -161,6 +161,76 @@ async function fetchWithHeaders(url, headers, env = process.env) {
   }
 }
 
+// Dig the real reason out of a json-schema-ref-parser failure.
+//
+// Its resolver wraps a plugin failure as `{ plugin, error }` — a plain object
+// with no `message` — and hands that to `new ResolverError(wrapper, url)`, whose
+// message falls back to `Error reading file "<url>"` when the thing it wraps has
+// none (util/errors.js). So the one line a build logs is the one line that says
+// nothing: the HTTP status, the DNS failure, the reset connection are all in
+// `wrapper.error.message`, thrown away before anybody sees it.
+//
+// Measured on docs.helex.org/emr: four specs failed with `Error reading file
+// "<url>"` and no way to tell why, while the same URLs answered 200 in 100 ms
+// from the same host a minute later.
+export function resolverCause(err) {
+  if (!err) return 'unknown error'
+  const seen = new Set()
+  const walk = (e, depth) => {
+    if (!e || depth > 4 || seen.has(e)) return null
+    seen.add(e)
+    // An inner error is more specific than its wrapper, so prefer it.
+    for (const inner of [e.error, e.cause, Array.isArray(e.errors) ? e.errors[0] : null]) {
+      const found = walk(inner, depth + 1)
+      if (found) return found
+    }
+    const msg = typeof e.message === 'string' ? e.message.trim() : ''
+    // The generic fallback is what we are trying to get past, not an answer.
+    return msg && !/^Error reading file "/.test(msg) ? msg : null
+  }
+  return walk(err, 0) || (typeof err.message === 'string' && err.message.trim()) || String(err)
+}
+
+// Retry a spec fetch. The documents are served by live services, and a service
+// that is restarting, a proxy that hiccups or a connection that resets makes one
+// attempt fail and the next succeed — with no retry, a build publishes that
+// module's API reference from a cached copy (or drops it) for a transient blip.
+// Deliberately not retried: a missing environment variable, and anything that is
+// not fetched over the network. Neither heals by asking again.
+export async function withRetries(fn, { attempts = 3, delayMs = 400, onRetry = () => {} } = {}) {
+  let lastError
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await fn(attempt)
+    } catch (err) {
+      lastError = err
+      if (err && err.missingEnv) break
+      if (attempt < attempts) {
+        onRetry(attempt, err)
+        // Linear backoff: the failures worth retrying here are blips, not load
+        // shedding, so waiting minutes buys nothing on a build that fetches ~30.
+        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt))
+      }
+    }
+  }
+  throw lastError
+}
+
+const isHttpSource = (src) => typeof src === 'string' && /^https?:\/\//i.test(src)
+
+// Replace every URL in a failure message with "the service", so that one unset
+// token across 32 specs groups as one problem instead of 32 near-identical
+// lines. The punctuation around the URL has to survive: the old pattern ran to
+// the next whitespace and swallowed the closing quote or the colon with it,
+// printing `Error reading file "the service` — an unbalanced line that read
+// like the message itself had been truncated.
+export function maskUrls(text) {
+  return String(text).replace(/https?:\/\/[^\s"'<>)\]]+/g, (match) => {
+    const trailing = /[:.,;!?]$/.test(match) ? match.slice(-1) : ''
+    return `the service${trailing}`
+  })
+}
+
 // Load and resolve every configured spec. Never throws: a spec that cannot be
 // read is reported and skipped, so one bad document can't fail a whole site.
 export async function loadOpenapiSpecs(cfg, log = () => {}) {
@@ -168,6 +238,9 @@ export async function loadOpenapiSpecs(cfg, log = () => {}) {
   const cacheDir = path.join(cfg.mdbookDir || cfg.projectRoot, '.mdbook', '.cache', 'openapi')
   const dir = path.join(path.dirname(cfg.build.staging), 'openapi')
   const out = {}
+  // `openapi.retries: 1` switches the retries off for a site that would rather
+  // see a failure immediately than wait for two more attempts.
+  const retries = Number.isInteger(cfg.openapi.retries) && cfg.openapi.retries > 0 ? cfg.openapi.retries : 3
 
   let parser
   try {
@@ -183,7 +256,7 @@ export async function loadOpenapiSpecs(cfg, log = () => {}) {
   // Group on the *kind* of failure, not the literal message: each one embeds its
   // own URL, which would otherwise make 32 identical 401s look like 32 problems.
   const note = (reason, name) => {
-    const key = reason.replace(/https?:\/\/\S*[^\s:]/g, 'the service')
+    const key = maskUrls(reason)
     problems.set(key, [...(problems.get(key) || []), name])
   }
 
@@ -195,13 +268,20 @@ export async function loadOpenapiSpecs(cfg, log = () => {}) {
       // bundle(), not dereference(): external files and URLs are pulled into one
       // document, but internal $refs stay put. That keeps schema *names* (so a
       // response reads `Pet[]`, not `object[]`) and makes recursive schemas safe.
-      doc = await parser.bundle(headers ? await fetchWithHeaders(src, headers) : src)
+      const load = async () => parser.bundle(headers ? await fetchWithHeaders(src, headers) : src)
+      doc = isHttpSource(src)
+        ? await withRetries(load, {
+            attempts: retries,
+            onRetry: (attempt, err) =>
+              log(pc.yellow(`openapi: ${name} attempt ${attempt} failed (${resolverCause(err)}) — retrying`))
+          })
+        : await load()
       fs.mkdirSync(dir, { recursive: true })
       fs.writeFileSync(cacheFile, JSON.stringify(doc))
     } catch (e) {
       // Unreachable or invalid: fall back to the last good copy if we have one.
       const fallback = [cacheFile, path.join(cacheDir, `${name}.json`)].find((f) => fs.existsSync(f))
-      const reason = e.message.split('\n')[0]
+      const reason = resolverCause(e).split('\n')[0]
       if (fallback) {
         doc = JSON.parse(fs.readFileSync(fallback, 'utf8'))
         note(`${reason} — using cached copy`, name)
