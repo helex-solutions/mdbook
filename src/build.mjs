@@ -27,6 +27,9 @@ import {
   SEARCH_INDEX_PREFIX
 } from './auth/acl.mjs'
 import { normalizeAccess } from './auth/config.mjs'
+import { buildPdfManifest } from './pdf/manifest.mjs'
+import { pdfBundle } from './pdf/config.mjs'
+import { fetchThemes } from './pdf/client.mjs'
 
 const MDBOOK_SRC = path.dirname(fileURLToPath(import.meta.url)) // .../mdbook/src
 
@@ -110,6 +113,9 @@ function makeBundle(cfg, model) {
         }
       : null,
     web,
+    // Client hint only — the md2pdf URL and token never enter the bundle; the
+    // browser talks to `mdbook serve`, never to the renderer.
+    pdf: pdfBundle(cfg.pdf),
     // Client hint only — issuer/client/secrets never enter the bundle; the
     // theme talks to the serve endpoints (/auth/session) and acl.json.
     auth: cfg.auth ? { enabled: true } : null,
@@ -396,6 +402,30 @@ function writeVitepressProject(cfg, model, staging) {
   fs.writeFileSync(path.join(vpDir, 'theme', 'index.js'), themeEntry)
 }
 
+// Name a misconfigured theme (or a missing logo) while someone is watching a
+// build, not when a reader clicks. A service that is simply down is a WARNING:
+// a docs build must not start depending on a renderer being up.
+async function checkPdfService(cfg) {
+  const { pdf } = cfg
+  if (pdf.cssPath && pdf.css == null) {
+    log(pc.yellow(`pdf: css file not found: ${pdf.cssPath}`))
+  }
+  if (pdf.logoPath && !pdf.logo) {
+    log(pc.yellow(`pdf: logo not found or not an image: ${pdf.logoPath}`))
+  }
+  try {
+    const themes = await fetchThemes(pdf)
+    const names = themes.map((t) => t.name)
+    if (pdf.theme && !names.includes(pdf.theme)) {
+      log(pc.yellow(`pdf: unknown theme "${pdf.theme}" — md2pdf offers: ${names.join(', ')}`))
+    } else {
+      log(`pdf: ${pc.bold(pdf.server)} theme ${pc.bold(pdf.theme)} scope [${pdf.scope.join(', ')}]`)
+    }
+  } catch (e) {
+    log(pc.yellow(`pdf: could not reach md2pdf at ${pdf.server} (${e?.message || e}) — export will fail until it is up`))
+  }
+}
+
 async function prepare(projectRoot, overrides = {}) {
   const cfg = loadConfig(projectRoot, overrides)
   log(`project ${pc.dim(cfg.projectRoot)}`)
@@ -418,6 +448,7 @@ async function prepare(projectRoot, overrides = {}) {
       ])
     )
   }
+  if (cfg.pdf) await checkPdfService(cfg)
   const staging = stageContent(cfg, model, openapiSpecs)
   if (cfg.source.format === 'owliki' && cfg.txServer) {
     log(`expanding {{csc}}/{{vsc}} from ${pc.dim(cfg.txServer)}`)
@@ -429,10 +460,22 @@ async function prepare(projectRoot, overrides = {}) {
 }
 
 export async function buildSite(projectRoot, overrides = {}) {
-  const { cfg, staging } = await prepare(projectRoot, overrides)
+  const { cfg, model, staging } = await prepare(projectRoot, overrides)
   const { build } = await import('vitepress')
   log('building…')
   await build(staging)
+  // Book-scope export order. Written from the sidebar model, which only the
+  // build has — `mdbook serve` sees the dist alone (src/pdf/manifest.mjs).
+  if (cfg.pdf) {
+    const manifest = buildPdfManifest({
+      sidebars: model.sidebars,
+      title: cfg.site.title || model.title,
+      defaultLang: model.defaultLang
+    })
+    fs.writeFileSync(path.join(cfg.build.out, 'pdf-manifest.json'), JSON.stringify(manifest, null, 2))
+    const n = Object.values(manifest.locales).reduce((a, l) => a + l.pages.length, 0)
+    log(`pdf: manifest written (${n} page(s) across ${Object.keys(manifest.locales).length} locale(s))`)
+  }
   if (cfg.auth && cfg.aclManifest) {
     fs.writeFileSync(path.join(cfg.build.out, 'acl.json'), JSON.stringify(cfg.aclManifest, null, 2))
     const n = Object.keys(cfg.aclManifest.pages).length

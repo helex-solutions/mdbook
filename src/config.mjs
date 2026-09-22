@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import yaml from 'js-yaml'
 import { normalizeAuth, normalizeAccess } from './auth/config.mjs'
+import { normalizePdf } from './pdf/config.mjs'
 
 const CONFIG_NAMES = ['config.yml', 'config.yaml', 'config.json']
 
@@ -94,6 +95,10 @@ export function loadConfig(projectRoot, overrides = {}) {
       plantumlServer: data.diagrams?.plantumlServer || data.diagrams?.plantuml || null
     },
     openapi: normalizeOpenapi(data.openapi, projectRoot),
+    // PDF export via the md2pdf service (docs/pdf-design.md). NOT `source.pdf`,
+    // which is the opposite direction — that one publishes PDFs stored in the
+    // repo AS pages; this one renders pages OUT as PDFs.
+    pdf: normalizePdf(data.pdf, projectRoot),
     // Site authentication (see docs/auth-design.md): OIDC gate + access rules,
     // resolved at build into acl.json and enforced by `mdbook serve`.
     auth: normalizeAuth(data.auth),
