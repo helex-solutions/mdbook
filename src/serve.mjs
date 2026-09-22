@@ -13,10 +13,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import http from 'node:http'
 import crypto from 'node:crypto'
+import { fileURLToPath } from 'node:url'
 import pc from 'picocolors'
 import { loadConfig } from './config.mjs'
 import { requirementFor, isAllowed } from './auth/acl.mjs'
 import { deniedPageHtml, signedOutPageHtml } from './auth/pages.mjs'
+import { buildDocument } from './pdf/export.mjs'
+import { renderPdf } from './pdf/client.mjs'
 
 const log = (msg) => console.log(pc.cyan('mdbook'), msg)
 
@@ -184,6 +187,24 @@ function send(res, status, body, type = 'text/plain; charset=utf-8', extra = {})
 
 const b64url = (buf) => Buffer.from(buf).toString('base64url')
 
+/**
+ * Content-Disposition with BOTH the ASCII and the RFC 5987 form.
+ *
+ * mdbook's sites are multilingual, and a Lithuanian or Czech page title reduced
+ * to dashes is a file nobody can find again. `filename=` keeps every client
+ * working; `filename*=` carries the real name.
+ */
+export function contentDisposition(name) {
+  const ascii = String(name || 'document')
+    .replace(/[\r\n"\\/]+/g, '')
+    .replace(/[^\w.\- ]+/g, '-')
+    .replace(/[\s-]{2,}/g, '-')
+    .replace(/^[-.\s]+/, '')
+    .trim() || 'document.pdf'
+  const utf8 = String(name || 'document').replace(/[\r\n"\\/]+/g, '').trim() || 'document.pdf'
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(utf8)}`
+}
+
 // Resolve a base-relative route to a file in the dist (cleanUrls layout).
 function resolveFile(dist, route) {
   const safe = path.normalize(route).replace(/^([/\\.])+/, '')
@@ -201,7 +222,7 @@ function resolveFile(dist, route) {
 }
 
 // Exported for tests: builds the request handler from resolved pieces.
-export function createHandler({ dist, base = '/', acl = null, auth = null, codec = null, quiet = false, siteTitle = 'Documentation' }) {
+export function createHandler({ dist, base = '/', acl = null, auth = null, codec = null, quiet = false, siteTitle = 'Documentation', pdf = null, mdbookDir = null }) {
   const trust = auth?.trustProxy || null
   let verifyBearer = null // lazy — jose is only imported when needed
 
@@ -384,6 +405,78 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
     return send(res, 404, 'not found')
   }
 
+  // ---- PDF export ----
+  async function handlePdf(req, res, route, url, session) {
+    // The theme asks this before showing a button, so a site built with `pdf:`
+    // and then published statically hides the control instead of offering one
+    // that cannot work.
+    if (route === '/pdf/status') {
+      return send(res, 200, JSON.stringify(pdf ? { enabled: true, scope: pdf.scope } : { enabled: false }), MIME['.json'], {
+        'Cache-Control': 'no-store'
+      })
+    }
+    if (!pdf) {
+      access(req, res, 404, session?.name, 'pdf-not-configured')
+      return send(res, 404, 'PDF export is not configured for this site')
+    }
+
+    const scope = url.searchParams.get('scope') === 'book' ? 'book' : 'page'
+    if (!pdf.scope.includes(scope)) {
+      return send(res, 400, `scope "${scope}" is not enabled for this site`)
+    }
+    // Only ever a path on this site. The document is read off disk from the
+    // dist, so the browser supplies a route and nothing else.
+    let target = url.searchParams.get('path') || '/'
+    if (!target.startsWith('/') || target.startsWith('//')) target = '/'
+    if (base !== '/' && target.startsWith(base)) target = '/' + target.slice(base.length)
+
+    let doc
+    try {
+      doc = buildDocument({
+        dist,
+        base,
+        route: target,
+        scope,
+        pdf,
+        acl: auth ? acl : null,
+        session,
+        siteTitle,
+        mdbookDir
+      })
+    } catch (e) {
+      const status = e?.status || 500
+      access(req, res, status, session?.name, `pdf-${scope}`)
+      if (status === 403 && !session) {
+        const returnTo = encodeURIComponent(url.pathname + url.search)
+        return send(res, 302, '', 'text/plain', { Location: `${base}auth/login?returnTo=${returnTo}` })
+      }
+      return send(res, status, String(e?.message || e))
+    }
+
+    try {
+      const bytes = await renderPdf(pdf, {
+        html: doc.html,
+        filename: doc.filename,
+        title: doc.title,
+        site: siteTitle,
+        options: doc.options
+      })
+      access(req, res, 200, session?.name, `pdf-${scope} ${bytes.length}B`)
+      res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Length': bytes.length,
+        'Content-Disposition': contentDisposition(doc.filename),
+        'Cache-Control': 'no-store'
+      })
+      return res.end(bytes)
+    } catch (e) {
+      const status = e?.status || 502
+      console.error(`pdf: ${e?.message || e}`)
+      access(req, res, status, session?.name, `pdf-${scope}-failed`)
+      return send(res, status, String(e?.message || e))
+    }
+  }
+
   const serveFile = (res, file, status = 200) => {
     const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream'
     const p = file.replace(/\\/g, '/')
@@ -409,6 +502,14 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
 
       if (auth && AUTH_ENDPOINTS.has(route.replace(/\/$/, ''))) {
         return await handleAuth(req, res, new URL(route.replace(/\/$/, '') + url.search, 'http://internal'), session)
+      }
+
+      // PDF export (docs/pdf-design.md). Handled here rather than resolved
+      // against the dist: the document is assembled from built pages, and the
+      // ACL check below is what stops a reader exporting a page they may not
+      // read — so it must not be reachable as a file.
+      if (route === '/pdf' || route === '/pdf/status') {
+        return await handlePdf(req, res, route, url, session)
       }
 
       const requirement = auth ? requirementFor(acl, route) : 'public'
@@ -496,7 +597,19 @@ export async function serveSite(projectRoot, overrides = {}) {
     log(`auth: default access "${Array.isArray(auth.access) ? auth.access.join(',') : auth.access}", ${Object.keys(acl.pages).length} protected page(s), ${acl.rules.length} rule(s)`)
   }
 
-  const handler = createHandler({ dist, base: cfg.site.base, acl, auth, codec, siteTitle: cfg.site.title })
+  if (cfg.pdf) {
+    log(`pdf: export via ${pc.dim(cfg.pdf.server)} (theme ${cfg.pdf.theme}, scope [${cfg.pdf.scope.join(', ')}])`)
+  }
+  const handler = createHandler({
+    dist,
+    base: cfg.site.base,
+    acl,
+    auth,
+    codec,
+    siteTitle: cfg.site.title,
+    pdf: cfg.pdf,
+    mdbookDir: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+  })
   const server = http.createServer(handler)
   const port = overrides.port || 8080
   const host = overrides.host === true ? '0.0.0.0' : overrides.host || '127.0.0.1'
