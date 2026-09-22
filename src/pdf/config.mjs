@@ -4,7 +4,7 @@
 //     server: http://md2pdf:18509     # REQUIRED — unset means no PDF export
 //     token: ${MD2PDF_TOKEN}         # when the service requires one
 //     scope: [page, book]            # which buttons the theme shows
-//     theme: site                    # site | plain | helex | taltech | …
+//     theme: site                    # site | plain | helex | … (GET /themes lists them)
 //     logo: ./.mdbook/logo.png       # inlined for a named theme's title block
 //     numbered: true                 # prefix 1. / 1.1 into heading text
 //     format: A4

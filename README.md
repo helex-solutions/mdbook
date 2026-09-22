@@ -219,7 +219,7 @@ pdf:
   token: ${MD2PDF_TOKEN}       # if the service requires one (env, never inline)
   scope: [page, book]          # which downloads to offer
   theme: site                  # site (the site's own skin) | plain | helex |
-                               #   helex-onepager | taltech | tervisekassa
+                               #   helex-onepager — or any theme md2pdf mounts
   numbered: true               # prefix 1. / 1.1 into heading text
   format: A4
   margin: { top: 18mm, right: 16mm, bottom: 20mm, left: 16mm }
@@ -511,11 +511,32 @@ than clipped, and external link URLs printed after the link.
 |---|---|
 | `site` (default) | the site's own skin — the PDF looks like the page |
 | `plain` | unstyled baseline: readable type, sane tables |
-| `helex`, `helex-onepager`, `taltech`, `tervisekassa` | brand documents, with a title block and a per-page footer |
+| `helex`, `helex-onepager` | brand documents, with a title block and a per-page footer |
+
+`GET /themes` on your md2pdf is the authoritative list, and the build checks
+`pdf.theme` against it — a typo is a warning while someone is watching a build,
+not a 400 when a reader clicks.
 
 A named theme can take a logo — `pdf.logo: ./.mdbook/logo.png`, inlined at build
 time — and `pdf.css` is applied last, so a deployment can adjust one without
 forking it.
+
+**More themes are mounted, not bundled.** md2pdf reads extra theme directories
+from `MD2PDF_THEMES_DIR`, so a deployment adds its own without a new image:
+
+```yaml
+  md2pdf:
+    image: ghcr.io/helex-solutions/md2pdf:latest
+    volumes:
+      - ./brand-themes:/themes:ro
+    environment:
+      MD2PDF_THEMES_DIR: /themes
+```
+
+That is where a theme carrying **another organisation's** visual identity
+belongs — a wordmark, a palette from their brand manual and their postal address
+are theirs, and a public image containing one would let anyone render a document
+that looks as though it came from them.
 
 ### Per-page layout
 

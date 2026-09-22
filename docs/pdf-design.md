@@ -129,10 +129,18 @@ reach it, which on a compose network is the intended posture.
 
 ### 3.3a Themes
 
-`GET /themes` lists them; `options.theme` picks one. They are ports of the
-`--format` presets of `~/bin/md2pdf.sh` (`helex`, `helex-onepager`, `taltech`,
-`tervisekassa`), plus `plain` and the default `site`, which applies none because
-the caller's document is already styled.
+`GET /themes` lists them; `options.theme` picks one. The service ships `helex`
+and `helex-onepager` — ports of the `--format` presets of `~/bin/md2pdf.sh` —
+plus `plain` and the default `site`, which applies none because the caller's
+document is already styled.
+
+**Only themes that project owns are bundled.** One carrying another
+organisation's visual identity is mounted at run time via `MD2PDF_THEMES_DIR`
+instead: a wordmark, a palette taken from a brand manual and a postal address are
+that organisation's, and a public image containing one would let anyone render a
+document that looks as though it came from them. A mounted theme may also share a
+name with a bundled one and win, which is how a deployment adjusts a shipped
+theme without forking the image.
 
 **The port is a translation, and two of its steps are worth recording because
 both failed silently.** The source sheets target WeasyPrint:
