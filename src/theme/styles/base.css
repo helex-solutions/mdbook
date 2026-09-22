@@ -572,3 +572,93 @@ a.mdbook-crumb:hover {
 .mdbook-auth-hidden {
   display: none !important;
 }
+
+/* PDF download control (src/theme/pdf.mjs). Sits beside the zoom control; it
+   renders nothing at all unless `mdbook serve` answers /pdf/status. */
+.mdbook-pdf-ui {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+}
+.mdbook-pdf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.mdbook-pdf-btn:hover {
+  color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+.mdbook-pdf-ico {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+}
+.mdbook-pdf-ico svg {
+  width: 100%;
+  height: 100%;
+}
+.mdbook-pdf-ico.is-spinning {
+  animation: mdbook-pdf-spin 0.9s linear infinite;
+}
+@keyframes mdbook-pdf-spin {
+  to { transform: rotate(360deg); }
+}
+/* Narrow screens: the nav bar is crowded, so only the icon stays. */
+@media (max-width: 768px) {
+  .mdbook-pdf-text { display: none; }
+}
+.mdbook-pdf-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 100;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-elv);
+  box-shadow: var(--vp-shadow-3);
+}
+.mdbook-pdf-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vp-c-text-1);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.mdbook-pdf-item:hover {
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-brand-1);
+}
+/* A failed export is SHOWN. Swallowing it is what leaves a reader clicking a
+   button that appears to do nothing. */
+.mdbook-pdf-error {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 100;
+  max-width: 320px;
+  padding: 8px 10px;
+  border: 1px solid var(--vp-c-danger-1, #d64545);
+  border-radius: 8px;
+  background: var(--vp-c-bg-elv);
+  color: var(--vp-c-danger-1, #d64545);
+  font-size: 12px;
+  line-height: 1.5;
+}

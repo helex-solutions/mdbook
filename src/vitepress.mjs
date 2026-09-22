@@ -81,6 +81,7 @@ function themeConfigFor(bundle, lang) {
     ...(bundle.footer ? { footer: bundle.footer } : {}),
     ...(bundle.openapi ? { openapi: bundle.openapi } : {}),
     ...(bundle.auth ? { auth: bundle.auth } : {}),
+    ...(bundle.pdf ? { pdf: bundle.pdf } : {}),
     outline: bundle.outline || [2, 3]
   }
 }
@@ -143,6 +144,14 @@ function seoHead(bundle) {
     // either way.
     if (bundle.spaceCode) {
       tags.push(['meta', { name: 'owliki:space', content: bundle.spaceCode }])
+    }
+    // Per-page PDF layout directives (README "PDF export"). Carried into the
+    // built HTML as a meta tag because that is the only channel the export has:
+    // it reads `dist/**.html`, not the staged markdown, so frontmatter that
+    // stays in pageData alone is invisible to it.
+    const pdfDirectives = pd.frontmatter?.pdf
+    if (pdfDirectives && typeof pdfDirectives === 'object') {
+      tags.push(['meta', { name: 'mdbook-pdf', content: JSON.stringify(pdfDirectives) }])
     }
     if (pd.frontmatter?.owlikiPage) {
       tags.push(['meta', { name: 'owliki:page', content: pd.frontmatter.owlikiPage }])
