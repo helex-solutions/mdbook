@@ -7,7 +7,7 @@ import os from 'node:os'
 import path from 'node:path'
 import http from 'node:http'
 import { parse } from 'node-html-parser'
-import { normalizePdf, pdfBundle } from '../src/pdf/config.mjs'
+import { normalizePdf, pdfBundle, size } from '../src/pdf/config.mjs'
 import { flattenSidebar, buildPdfManifest, langForRoute, subtreePages, routeKey } from '../src/pdf/manifest.mjs'
 import {
   readDirectives,
@@ -73,6 +73,27 @@ test('pdf: the client bundle carries the scope and NOT the server or token', () 
 test('pdf: an unknown scope value is dropped rather than passed through', () => {
   const cfg = normalizePdf({ server: 'http://x:18509', scope: ['page', 'universe'] }, '/tmp')
   assert.deepEqual(cfg.scope, ['page'])
+})
+
+test('pdf: a size takes a unit, and 0 is a deliberate "no limit"', () => {
+  assert.equal(size('32mb', 1), 33554432)
+  assert.equal(size('512 KB', 1), 524288)
+  assert.equal(size(4096, 1), 4096)
+  assert.equal(size(0, 99), 0) // off switch, not a fallback
+  assert.equal(size('wide', 7), 7) // junk falls back rather than becoming 0
+  assert.equal(size(-5, 7), 7)
+})
+
+test('pdf: an export has a page and a byte ceiling, both overridable', () => {
+  const dflt = normalizePdf({ server: 'http://x:18509' }, '/tmp')
+  assert.equal(dflt.maxPages, 200)
+  assert.equal(dflt.maxBytes, 33554432)
+  const tuned = normalizePdf({ server: 'http://x:18509', maxPages: 600, maxBytes: '64mb' }, '/tmp')
+  assert.equal(tuned.maxPages, 600)
+  assert.equal(tuned.maxBytes, 67108864)
+  const off = normalizePdf({ server: 'http://x:18509', maxPages: 0, maxBytes: 0 }, '/tmp')
+  assert.equal(off.maxPages, 0)
+  assert.equal(off.maxBytes, 0)
 })
 
 // ---------------------------------------------------------------- manifest ---
@@ -531,6 +552,57 @@ test('export: a subpages export of a missing page is a 404, not an empty documen
     () => buildDocument({ dist: TREE(), route: '/nope', scope: 'subpages', pdf: PDF, mdbookDir: '.' }),
     (e) => e.status === 404
   )
+})
+
+test('export: too many pages is refused before a single one is read', () => {
+  // 413 rather than a document: the export that kills the serving process is
+  // the one that is never started.
+  const dist = TREE()
+  assert.throws(
+    () => buildDocument({ dist, route: '/guide/', scope: 'subpages', pdf: { ...PDF, maxPages: 2 }, mdbookDir: '.' }),
+    (e) => e.status === 413 && /4 pages and the limit is 2/.test(e.message)
+  )
+  // Book scope is the same failure, so it gets the same guard.
+  assert.throws(
+    () => buildDocument({ dist, route: '/', scope: 'book', pdf: { ...PDF, maxPages: 2 }, mdbookDir: '.' }),
+    (e) => e.status === 413
+  )
+  // One page is never the problem.
+  assert.ok(buildDocument({ dist, route: '/guide/', scope: 'page', pdf: { ...PDF, maxPages: 2 }, mdbookDir: '.' }).html)
+})
+
+test('export: the byte ceiling stops the assembly mid-way, naming where', () => {
+  const dist = TREE()
+  assert.throws(
+    // 60 bytes is past the first section (45) and short of the second (69), so
+    // the refusal has to come from INSIDE the loop, not from a final check.
+    () => buildDocument({ dist, route: '/guide/', scope: 'subpages', pdf: { ...PDF, maxBytes: 60 }, mdbookDir: '.' }),
+    (e) => e.status === 413 && /at page 2 of 4/.test(e.message)
+  )
+})
+
+test('export: 0 means no limit, for a deployment that has measured its own site', () => {
+  const dist = TREE()
+  const doc = buildDocument({
+    dist, route: '/guide/', scope: 'subpages', pdf: { ...PDF, maxPages: 0, maxBytes: 0 }, mdbookDir: '.'
+  })
+  assert.match(doc.html, /<h1[^>]*>4\. X<\/h1>/)
+})
+
+test('export: the ceiling counts the pages THIS reader may open, not the site', () => {
+  // The ACL runs first, so a gated site does not refuse a reader whose own
+  // document is small — and a reader cannot spend the server's memory on pages
+  // they cannot read.
+  const dist = TREE()
+  const pdf = { ...PDF, maxPages: 3 }
+  assert.throws(
+    () => buildDocument({ dist, route: '/guide/', scope: 'subpages', pdf, mdbookDir: '.' }),
+    (e) => e.status === 413
+  )
+  const anon = buildDocument({
+    dist, route: '/guide/', scope: 'subpages', pdf, acl: TREE_ACL, session: null, mdbookDir: '.'
+  })
+  assert.match(anon.html, /Omitted pages/) // 2 of the 4 are gated, so it fits
 })
 
 test('export: a book built without a manifest says so instead of emitting nothing', () => {

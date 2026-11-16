@@ -115,11 +115,27 @@ export function buildDocument({ dist, base = '/', route, scope = 'page', pdf, ac
     if (!files.length) {
       throw Object.assign(new Error('no pages in this export are readable by you'), { status: 403 })
     }
+    // Refused BEFORE a single page is read. The count is of the pages this
+    // reader may actually open, so the ceiling is per reader, and it costs
+    // nothing to apply — which is the point: the document that kills the
+    // process is the one that is never started. (docs/pdf-design.md §4.2)
+    const maxPages = pdf.maxPages ?? 200
+    if (maxPages && files.length > maxPages) {
+      throw Object.assign(
+        new Error(
+          `this export is ${files.length} pages and the limit is ${maxPages} — ` +
+            'download a section at a time, or raise pdf.maxPages for this site'
+        ),
+        { status: 413 }
+      )
+    }
     const collection = scope === 'book' || files.length > 1
 
     const sections = []
     let css = ''
     let firstHtml = ''
+    let bytes = 0
+    const maxBytes = pdf.maxBytes ?? 32 * 1048576
     for (const file of files) {
       const html = fs.readFileSync(file, 'utf8')
       if (!css) css = siteCss(html, dist, base)
@@ -131,7 +147,23 @@ export function buildDocument({ dist, base = '/', route, scope = 'page', pdf, ac
         wholeBook: collection,
         section: sections.length + 1
       })
-      if (section) sections.push(section)
+      if (!section) continue
+      sections.push(section)
+      // Checked AS IT GROWS, not at the end: the end is what we are trying not
+      // to reach. Pages carry their images inlined as data: URIs, so a page is
+      // hundreds of KB rather than tens, and the parse trees behind this string
+      // cost an order of magnitude more again — a measured 523 MB of RSS for
+      // 26.5 MB of sections. Stopping at the ceiling stops all three.
+      bytes += section.html.length
+      if (maxBytes && bytes > maxBytes) {
+        throw Object.assign(
+          new Error(
+            `this export passed ${Math.round(maxBytes / 1048576)} MB at page ${sections.length} ` +
+              `of ${files.length} — download a section at a time, or raise pdf.maxBytes for this site`
+          ),
+          { status: 413 }
+        )
+      }
     }
     if (!sections.length) {
       throw Object.assign(new Error('no pages in this export have an article to export'), { status: 409 })
