@@ -222,6 +222,8 @@ pdf:
           book]                #   is what the button does on a plain click
   theme: site                  # site (the site's own skin) | plain | helex |
                                #   helex-onepager — or any theme md2pdf mounts
+  maxPages: 200                # refuse a multi-page export larger than this
+  maxBytes: 32mb               #   ...or heavier than this (0 disables either)
   numbered: true               # prefix 1. / 1.1 into heading text
   format: A4
   margin: { top: 18mm, right: 16mm, bottom: 20mm, left: 16mm }
@@ -590,6 +592,38 @@ These apply to a single-page export only; a `subpages` or `book` export of
 several pages ignores them, because a dozen pages each claiming a different page
 box cannot all be honoured. (A `subpages` export that collapses to one page is a
 single-page export, and does honour them.)
+
+### How big an export may be
+
+A `subpages` or `book` export is assembled **in the serving process**, which
+serves everybody, so it has a ceiling. Over it, the download answers `413` with
+the numbers in it rather than producing a short document that looks complete:
+
+```
+this export is 2422 pages and the limit is 200 — download a section at a
+time, or raise pdf.maxPages for this site
+```
+
+| Key | Default | Checked |
+|---|---|---|
+| `pdf.maxPages` | `200` | before any page is read, so an oversized export costs nothing |
+| `pdf.maxBytes` | `32mb` | as the document grows, stopping at the page that crosses it |
+
+Two ceilings because they fail differently. Page count is a poor proxy for
+weight — images are inlined as `data:` URIs, so a page is *hundreds* of
+kilobytes, and a hundred screenshot-heavy pages outweigh a thousand plain ones —
+while the byte count cannot be known before the work is done. Both count only
+the pages **the reader asking may open**, since access control is applied first.
+
+`0` turns either off for a deployment that has measured its own site.
+
+**Why it matters on a big site.** The document is far more expensive than its
+own size: every page is parsed on the way through, so peak memory runs about an
+order of magnitude above the bytes. A 2400-page export measured as an
+out-of-memory kill of the server — which, with `restart unless-stopped`, makes
+one reader's click an outage for everyone. `docs/pdf-design.md` §4.2 has the
+measurements, and §4.3 explains why streaming is md2pdf's problem rather than a
+knob here.
 
 ### Heading numbering
 

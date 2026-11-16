@@ -7,6 +7,8 @@
 //                                    #   FIRST is the control's default click
 //     theme: site                    # site | plain | helex | … (GET /themes lists them)
 //     logo: ./.mdbook/logo.png       # inlined for a named theme's title block
+//     maxPages: 200                  # refuse a multi-page export larger than this
+//     maxBytes: 32mb                 # ...or heavier than this (0 = no limit)
 //     numbered: true                 # prefix 1. / 1.1 into heading text
 //     format: A4
 //     landscape: false
@@ -38,6 +40,27 @@ function fromEnv(value) {
 
 const LENGTH = /^\d+(\.\d+)?(mm|cm|in|px|pt)$/
 const length = (v, fallback) => (typeof v === 'string' && LENGTH.test(v.trim()) ? v.trim() : fallback)
+
+// A size, as a plain byte count or with a unit — `32mb` is the readable form and
+// the one the README documents. 0 means no limit, deliberately, the same way
+// `scope: []` is a deliberate off switch: a deployment that has measured its own
+// site may say so, but it has to say so.
+const UNITS = { b: 1, kb: 1024, mb: 1048576, gb: 1073741824 }
+export function size(value, fallback) {
+  if (value === 0) return 0
+  if (typeof value === 'number') return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback
+  if (typeof value !== 'string') return fallback
+  const m = /^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)?$/i.exec(value.trim())
+  if (!m) return fallback
+  const n = Number(m[1]) * UNITS[(m[2] || 'b').toLowerCase()]
+  return n > 0 ? Math.floor(n) : 0
+}
+
+const count = (value, fallback) => {
+  if (value === 0) return 0
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return fallback
+  return Math.floor(value)
+}
 
 export function normalizePdf(data, projectRoot) {
   if (!data || data.enabled === false) return null
@@ -77,6 +100,14 @@ export function normalizePdf(data, projectRoot) {
     theme: data.theme || 'site',
     logo,
     logoPath: data.logo || null, // kept for the "configured but missing" warning
+    // What a multi-page export may not exceed. Both are per REQUEST and per
+    // READER — the count is of the pages this session may actually read — and
+    // both exist because they fail differently: the page count is known before
+    // anything is read, so it refuses instantly and for free, while the byte
+    // ceiling is the one that actually stands between a big site and the
+    // serving process dying mid-assembly. See docs/pdf-design.md §4.2.
+    maxPages: count(data.maxPages, 200),
+    maxBytes: size(data.maxBytes, 32 * 1048576),
     numbered: data.numbered ?? true,
     footer: data.footer ?? true,
     format: data.format || 'A4',

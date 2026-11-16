@@ -269,6 +269,88 @@ and a reader cannot tell a leaf from a branch before clicking.
 may not open it gets the same 403 — and the same login redirect — that page scope
 gives, rather than a document of that page's children.
 
+### 4.2 Size — why an export can be refused
+
+A multi-page export is assembled **in the serving process**, and that process
+serves everybody. Three copies of the same bytes exist before Chromium lays out
+a single page: the sections as they accumulate, the string `assemble()` joins
+them into, and the JSON body `client.mjs` encodes for md2pdf. A fourth lives in
+md2pdf itself.
+
+Measured here, on real sites, with the export path itself rather than a model:
+
+| site | pages | sections | mean | peak RSS |
+|---|---|---|---|---|
+| a tutorial site | 80 | 26.5 MB | 339 KB/page | 523 MB |
+| a registry site | 18 | 7.7 MB | 437 KB/page | 165 MB |
+| the manuals site | 317 | 9.9 MB | 31 KB/page | — |
+
+Two things in the first two rows set the design. A page that carries images is
+**hundreds of kilobytes**, not tens, because §4 inlines them as `data:` URIs —
+the thing that makes the document self-contained is also what makes it heavy. And peak RSS runs an
+**order of magnitude above the bytes**, because every page is parsed into a DOM
+on the way through. A document is far more expensive than its own size.
+
+The third row is the counter-case, and it is why there are two ceilings rather
+than one. Its pages are prose, so they run an order of magnitude lighter, and
+the **whole 317-page menu** assembles into 9.9 MB — comfortably under the byte
+ceiling, and refused only by the page one. Neither number on its own describes
+an export.
+
+Extrapolating the first row to the 2422-page site this project also serves gives
+roughly 800 MB of sections before the join. That is not a slow download: the
+deployment measured it as `FATAL ERROR ... JavaScript heap out of memory` after
+74 seconds, and because the container restarts, **one reader pressing the button
+is an outage for everyone**. That is the failure being fenced.
+
+**Refused, not narrowed.** An export over the ceiling answers `413` with the
+numbers in it. Quietly dropping pages to fit would produce a document that looks
+complete and is not — the rule §4 already follows for pages a reader may not
+read, and for collapsed `<details>`.
+
+**Two ceilings, because they fail differently.**
+
+- `pdf.maxPages` (default 200) is checked **before a single page is read**. The
+  count is known from the manifest, so the document that would kill the process
+  is never started, and the refusal costs nothing.
+- `pdf.maxBytes` (default 32 MB) is checked **as the sections accumulate**, and
+  stops at the page that crosses it. This is the one that actually stands
+  between a site and the heap, because page count is a poor proxy for weight: a
+  hundred screenshot-heavy pages outweigh a thousand plain ones.
+
+Both count only the pages **this reader may open**, because the ACL runs first.
+A gated site does not refuse a reader whose own document is small, and a reader
+cannot spend the server's memory on pages they cannot read. `0` disables either
+one, deliberately, the way `scope: []` is a deliberate off switch: a deployment
+that has measured its own site may say so, but it has to say so.
+
+**Book scope is guarded too**, for the same reason it needs guarding: it is the
+same assembly. Until now a large site avoided the failure only by not offering
+the button, which protected the site but left the failure one config edit away.
+
+### 4.3 Why not stream instead
+
+The honest answer is that streaming is not available here, and the reason is in
+the contract rather than in this code.
+
+`POST /pdf` takes **one** self-contained document and renders it with
+`setContent` (§3.2, §3.4). Chunking the upload would remove mdbook's JSON copy
+and nothing else: Chromium would still hold the whole document, still lay it out
+in one pass, and the 60s render timeout would still be the ceiling for a book.
+
+What would actually remove the ceiling is md2pdf growing a **merge**: render N
+bounded documents and concatenate the PDFs. Then neither process ever holds the
+whole book, and the limit becomes disk rather than heap. It is a real design,
+and it is md2pdf's to make — with two consequences that belong in its design
+rather than this one: page numbering and the table of contents have to be
+resolved across chunks, which means either a numbering pass before rendering or
+a post-pass over the merged file.
+
+So the ceiling here is a fence, not a fix, and it is named as one. The
+deployments that read "restore it when a book export streams" now have an
+answer: that work is in md2pdf, and until it exists, a section is the document
+that fits.
+
 ## 5. `print.css`
 
 One stylesheet, used twice: by Chromium inside md2pdf, and by a reader pressing
