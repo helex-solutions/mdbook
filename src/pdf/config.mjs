@@ -3,7 +3,8 @@
 //   pdf:
 //     server: http://md2pdf:18509     # REQUIRED — unset means no PDF export
 //     token: ${MD2PDF_TOKEN}         # when the service requires one
-//     scope: [page, book]            # which buttons the theme shows
+//     scope: [page, subpages, book]  # which downloads the theme offers; the
+//                                    #   FIRST is the control's default click
 //     theme: site                    # site | plain | helex | … (GET /themes lists them)
 //     logo: ./.mdbook/logo.png       # inlined for a named theme's title block
 //     numbered: true                 # prefix 1. / 1.1 into heading text
@@ -23,7 +24,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-const SCOPES = ['page', 'book']
+// Order matters: it is the order the theme lists them in, and its first entry is
+// what the download button does on a plain click.
+const SCOPES = ['page', 'subpages', 'book']
 
 // `${VAR}` from the environment — a token belongs in the deployment, not in a
 // config file, and is never written into the built site.

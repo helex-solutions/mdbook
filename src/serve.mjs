@@ -420,7 +420,10 @@ export function createHandler({ dist, base = '/', acl = null, auth = null, codec
       return send(res, 404, 'PDF export is not configured for this site')
     }
 
-    const scope = url.searchParams.get('scope') === 'book' ? 'book' : 'page'
+    // An unknown scope is the single page, never an error: the narrowest
+    // document is the safe reading of a request this build does not understand.
+    const asked = url.searchParams.get('scope')
+    const scope = ['page', 'subpages', 'book'].includes(asked) ? asked : 'page'
     if (!pdf.scope.includes(scope)) {
       return send(res, 400, `scope "${scope}" is not enabled for this site`)
     }

@@ -34,7 +34,7 @@ Real sites built with mdbook — click a thumbnail for the live site (see
 - 📊 **Diagrams** — draw.io (including the wiki's versioned `{{drawio:name}}` macro, which always resolves to the newest saved version), Mermaid, and PlantUML (opt-in server, see `diagrams:`)
 - 💻 **Code** — Shiki highlighting for every fenced block; a fence that cites a source file (```` ```43:58:src/Foo.java ````) is highlighted by the file's extension and captioned with the path
 - 📄 **PDFs** — a PDF stored in the repo is published like a page: listed in the menu, previewed inline and downloadable (see [PDFs](#pdfs))
-- 🖨️ **PDF export** — the opposite direction: a **Download PDF** control on every page turns the page, or the whole book, into a document — numbered, with a cover and contents. Needs the [md2pdf](https://github.com/helex-solutions/md2pdf) service (see [PDF export](#pdf-export)). Every site prints properly from Ctrl-P regardless
+- 🖨️ **PDF export** — the opposite direction: a **Download PDF** control on every page turns the page, a section with all its subpages, or the whole book into a document — numbered, with a cover and contents. Needs the [md2pdf](https://github.com/helex-solutions/md2pdf) service (see [PDF export](#pdf-export)). Every site prints properly from Ctrl-P regardless
 - 🌐 **OpenAPI** — render one or many OpenAPI 3.1 / 3.0 / Swagger 2.0 documents into searchable reference pages, from a whole document down to a single operation, with an optional try-it console authenticated via OpenID Connect (see [OpenAPI](#openapi))
 - 🔗 **Terminology** — `{{csc:}}`/`{{vsc:}}` concept tables fetched from a FHIR server at build time; `{{def:}}` renders an include card naming the definition
 - 🏷️ **SEO** — per-page titles/descriptions, `sitemap.xml`, canonical + Open Graph/Twitter tags, JSON-LD and `robots.txt`. Descriptions, languages and site URL are read from the Owliki export when authored (site URL also auto-detected in CI), with first-paragraph/CI inference as the fallback; page **tags** are emitted as `<meta name="keywords">`
@@ -217,7 +217,8 @@ source:
 pdf:
   server: http://md2pdf:18509  # REQUIRED — naming the server is the switch
   token: ${MD2PDF_TOKEN}       # if the service requires one (env, never inline)
-  scope: [page, book]          # which downloads to offer
+  scope: [page, subpages,      # which downloads to offer; the first of them
+          book]                #   is what the button does on a plain click
   theme: site                  # site (the site's own skin) | plain | helex |
                                #   helex-onepager — or any theme md2pdf mounts
   numbered: true               # prefix 1. / 1.1 into heading text
@@ -450,9 +451,37 @@ PDFs *stored in the repo*, published as pages — PDFs **in**. This one turns
 *pages* into PDFs — **out**. They are configured by two different keys:
 `source.pdf` for the first, the top-level `pdf:` block for this one.
 
-With it enabled, every page carries a **Download PDF** control in the nav bar,
-offering the page itself and — if you enable it — the whole book as one document
-with a cover, a table of contents and numbered sections.
+With it enabled, every page carries a **Download PDF** control in the nav bar. It
+is a split button: clicking it downloads the page, and the caret beside it offers
+the wider documents.
+
+| `pdf.scope` entry | Button | What the document contains |
+|---|---|---|
+| `page` | **This page** | the page, on its own |
+| `subpages` | **Page + subpages** | the page and every page under it in the menu |
+| `book` | **Whole book** | every page in the site, in menu order |
+
+`subpages` and `book` come out as one document with a cover, a table of contents
+and numbered sections — `1. Guide`, `2. Installing`, and `2.1`, `2.2` inside
+each. `subpages` is the one most readers want: a section of a handbook is a
+document someone can actually be handed, where the whole site is a book nobody
+reads in one sitting.
+
+All three are enabled by default. `scope` is also an **order** — its first entry
+is what a plain click does, so `scope: [subpages, page, book]` makes the section
+the default download and leaves the single page in the menu.
+
+### What "under it in the menu" means
+
+The **menu**, not the folder. The subtree is taken from the sidebar the reader
+navigated, so a `SUMMARY.md` that files a page under a chapter it shares no path
+with still exports as the menu reads. In the auto folder-tree layout the two are
+the same thing anyway.
+
+Asked from a page with no children, `subpages` gives exactly what `page` gives —
+the same document, that page's own frontmatter layout directives included — so
+the control never fails on a leaf page. Asked from the home page, it is the whole
+menu, which is the book.
 
 ### What it needs
 
@@ -489,8 +518,9 @@ from its own `dist/`, inlines the stylesheet and images, and posts it to md2pdf.
 
 The browser never talks to md2pdf. That is what lets **access control apply to the
 export**: on a gated site a reader cannot export a page they cannot read, and a
-whole-book export contains exactly the pages *that reader* may see — the rest are
-listed at the end rather than silently dropped.
+multi-page export contains exactly the pages *that reader* may see — the rest are
+listed at the end rather than silently dropped. A `subpages` export is refused
+outright if the reader may not read the page it was asked from.
 
 **The feature therefore needs `mdbook serve`.** On a statically hosted site
 (GitHub Pages) there is no endpoint to answer, so the control hides itself rather
@@ -555,8 +585,10 @@ pdf: { orientation: landscape, margins: narrow, scale: 0.9, tables: fit }
 | `scale` | `0.5`–`1.5` |
 | `tables` | `fit` — shrink wide tables to the page instead of overflowing it |
 
-These apply to a single-page export only; a book export ignores them, because a
-dozen pages each claiming a different page box cannot all be honoured.
+These apply to a single-page export only; a `subpages` or `book` export of
+several pages ignores them, because a dozen pages each claiming a different page
+box cannot all be honoured. (A `subpages` export that collapses to one page is a
+single-page export, and does honour them.)
 
 ### Heading numbering
 

@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { requirementFor, isAllowed } from '../auth/acl.mjs'
 import { renderSection, assemble, siteCss, readDirectives } from './document.mjs'
-import { langForRoute } from './manifest.mjs'
+import { langForRoute, subtreePages, routeKey } from './manifest.mjs'
 
 // Base-relative route -> the built HTML file, mirroring serve.mjs's own
 // cleanUrls resolution.
@@ -45,6 +45,13 @@ function readManifest(dist) {
   }
 }
 
+// The menu's own label for a route — a fallback for the document name when the
+// built page has no title to read.
+function titleFor(pages, route) {
+  const key = routeKey(route)
+  return (pages || []).find((p) => routeKey(p.route) === key)?.title || null
+}
+
 export function printCss(mdbookDir) {
   const p = path.join(mdbookDir, 'src', 'theme', 'styles', 'print.css')
   return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : ''
@@ -56,16 +63,19 @@ export function printCss(mdbookDir) {
  * Returns `{ html, filename, title }`, or throws with a `status`.
  *
  * Page scope: the one page, ACL-checked.
- * Book scope: every page in the locale's manifest order that THIS SESSION may
- * read. Pages it may not are listed at the end rather than dropped — a document
- * that looks complete and is not is the worst artefact, because it is the one
- * that gets filed. (Same rule as OWLIKI.06 §2.3's omitted-language list.)
+ * Subpages scope: that page and everything under it in the menu.
+ * Book scope: every page in the locale's manifest order.
+ *
+ * The two multi-page scopes contain what THIS SESSION may read. Pages it may not
+ * are listed at the end rather than dropped — a document that looks complete and
+ * is not is the worst artefact, because it is the one that gets filed. (Same rule
+ * as OWLIKI.06 §2.3's omitted-language list.)
  */
 export function buildDocument({ dist, base = '/', route, scope = 'page', pdf, acl = null, session = null, siteTitle = 'Documentation', mdbookDir }) {
   const css0 = printCss(mdbookDir)
   const stamp = new Date().toISOString().slice(0, 10)
 
-  if (scope === 'book') {
+  if (scope === 'book' || scope === 'subpages') {
     const manifest = readManifest(dist)
     if (!manifest) {
       throw Object.assign(new Error('this site was built without a PDF manifest — rebuild with pdf configured'), { status: 409 })
@@ -75,42 +85,81 @@ export function buildDocument({ dist, base = '/', route, scope = 'page', pdf, ac
     const locale = manifest.locales?.[lang] || manifest.locales?.[manifest.defaultLang]
     if (!locale?.pages?.length) throw Object.assign(new Error('no pages to export'), { status: 409 })
 
-    const sections = []
+    let pages = locale.pages
+    if (scope === 'subpages') {
+      // The page it was asked FROM is checked first and on its own, so a reader
+      // who may not open it gets the page scope's 403 (and the login redirect
+      // serve.mjs hangs off it) rather than a document of its children.
+      if (!allowed(acl, route, session)) throw Object.assign(new Error('not allowed'), { status: 403 })
+      if (!pageFile(dist, route)) throw Object.assign(new Error('no such page'), { status: 404 })
+      pages = subtreePages(locale.pages, route)
+      // A page outside the menu has no children to find. Exporting it alone is
+      // the honest answer; refusing would be a button that fails on some pages.
+      if (!pages.length) pages = [{ route, title: null }]
+    }
+
+    // Resolved before anything is rendered, because the COUNT decides the shape
+    // of the document: one page is a page, not a book with a cover and a
+    // one-line table of contents.
     const omitted = []
-    let css = ''
-    for (const page of locale.pages) {
+    const files = []
+    for (const page of pages) {
       if (!allowed(acl, page.route, session)) {
         omitted.push(page.title || page.route)
         continue
       }
       const file = pageFile(dist, page.route)
       if (!file) continue // in the menu, not in the build — nothing to render
+      files.push(file)
+    }
+    if (!files.length) {
+      throw Object.assign(new Error('no pages in this export are readable by you'), { status: 403 })
+    }
+    const collection = scope === 'book' || files.length > 1
+
+    const sections = []
+    let css = ''
+    let firstHtml = ''
+    for (const file of files) {
       const html = fs.readFileSync(file, 'utf8')
       if (!css) css = siteCss(html, dist, base)
+      if (!firstHtml) firstHtml = html
       const section = renderSection(html, {
         dist,
         base,
         numbered: pdf.numbered,
-        wholeBook: true,
+        wholeBook: collection,
         section: sections.length + 1
       })
       if (section) sections.push(section)
     }
     if (!sections.length) {
-      throw Object.assign(new Error('no pages in this export are readable by you'), { status: 403 })
+      throw Object.assign(new Error('no pages in this export have an article to export'), { status: 409 })
     }
+
+    // A book is titled by the book; a subpages export by the page it was asked
+    // from — that is the name a reader will look for the file under.
+    const name =
+      scope === 'book'
+        ? locale.title || siteTitle
+        : sections[0].title || titleFor(locale.pages, route) || siteTitle
+    // Collapsed to the single page it was asked from, a subpages export IS a
+    // page export, so it honours that page's layout directives too. A real
+    // collection cannot: a dozen pages each claiming a page box cannot all win.
+    const directives = collection ? null : readDirectives(firstHtml)
     return {
-      title: locale.title || siteTitle,
-      filename: `${slug(locale.title || siteTitle)}.pdf`,
+      title: name,
+      filename: `${slug(name)}.pdf`,
+      options: directives ? { landscape: directives.landscape, margin: directives.margin, scale: directives.scale } : null,
       html: assemble({
-        title: locale.title || siteTitle,
+        title: name,
         siteTitle,
         sections,
         css,
         printCss: css0,
-        extraCss: pdf.css || '',
-        toc: true,
-        coverDate: stamp,
+        extraCss: [pdf.css || '', directives?.css || ''].filter(Boolean).join('\n'),
+        toc: collection,
+        coverDate: collection ? stamp : null,
         omitted
       })
     }
