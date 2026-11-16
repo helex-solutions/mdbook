@@ -1,7 +1,7 @@
 # PDF export — design
 
-How a reader turns a page (or a whole book) into a PDF, and why it is split
-across two processes.
+How a reader turns a page — or a section with its subpages, or a whole book —
+into a PDF, and why it is split across two processes.
 
 This mirrors the wiki's own export design (helex-tx `OWLIKI.06`) rather than
 inventing a second one. The load-bearing rule is carried over verbatim:
@@ -226,6 +226,49 @@ skips pages the caller may not read, listing them at the end the way the wiki
 lists pages omitted for language. A silent gap makes a document that looks
 complete and is not.
 
+### 4.1 Subpages scope
+
+Between one page and the whole site is the document people actually ask for: a
+chapter, a handbook section, one subsystem's reference — the page they are on,
+with everything filed under it.
+
+**Membership is the menu, not the filesystem.** `pdf-manifest.json` therefore
+records each page's `parent` — its parent in the resolved sidebar — and the
+subtree is the transitive closure over those links (`subtreePages()`), emitted in
+manifest order. Route-prefix matching was the obvious alternative and is wrong
+for the case that matters: a `SUMMARY.md` may file a page under a chapter whose
+path it does not share, and the reader's claim on the document is the menu they
+navigated. A manifest written before `parent` existed has none, and membership
+falls back to the route prefix — a stale `dist` gives a coarser document rather
+than an empty one.
+
+Two consequences of recording the parent are worth stating, because both were
+bugs first:
+
+- In the folder-tree layout a section's sidebar is an entry **keyed by** the
+  landing page, not nested under it. Read naively, every section's pages come out
+  parentless and a subpages export from a landing page finds no children at all.
+  `flattenSidebar()` passes the section key down as the parent for that walk.
+- The landing page is also the one entry that is always a **duplicate** (the root
+  sidebar links into the section; the section's own sidebar repeats it). So the
+  parent handed to its children is set from the entry that was *walked*, not from
+  the entry that was *pushed* — the push is skipped by the dedupe.
+
+A page at the top level has no parent, so its parent is taken to be the site
+root. That makes a subpages export asked from the home page the whole menu,
+which is the book — the honest answer rather than one lonely page.
+
+**One page is a page.** Asked from a leaf, the scope produces exactly what page
+scope produces: no cover, no one-line table of contents, no `1.` in front of the
+only `h1`, and that page's own layout directives honoured (§4's directives are
+page-scope only because a *collection* cannot honour twelve of them — a
+collection of one can). The alternative is a control that fails on leaf pages,
+and a reader cannot tell a leaf from a branch before clicking.
+
+**The page it is asked from is ACL-checked on its own, first**, so a reader who
+may not open it gets the same 403 — and the same login redirect — that page scope
+gives, rather than a document of that page's children.
+
 ## 5. `print.css`
 
 One stylesheet, used twice: by Chromium inside md2pdf, and by a reader pressing
@@ -244,6 +287,9 @@ link — a paper document with unfollowable links is the common failure.
 
 ## 6. Deliberately absent
 
+- **No per-page "download this section" link in the body.** The nav-bar control
+  already knows which page it is on, and a second entry point would have to be
+  kept in step with the ACL at render time rather than at request time.
 - **No cache.** Same reasoning as `OWLIKI.06` §2.7: a cache is a scaling decision
   that should follow evidence of a cost. The escalation path if one appears is a
   build-time pre-render into `dist`, not a second state store.

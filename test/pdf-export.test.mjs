@@ -8,7 +8,7 @@ import path from 'node:path'
 import http from 'node:http'
 import { parse } from 'node-html-parser'
 import { normalizePdf, pdfBundle } from '../src/pdf/config.mjs'
-import { flattenSidebar, buildPdfManifest, langForRoute } from '../src/pdf/manifest.mjs'
+import { flattenSidebar, buildPdfManifest, langForRoute, subtreePages, routeKey } from '../src/pdf/manifest.mjs'
 import {
   readDirectives,
   distFile,
@@ -48,7 +48,7 @@ test('pdf: naming the server IS the switch; no server means no feature', () => {
   assert.equal(normalizePdf({ server: 'http://md2pdf:18509', scope: [] }, '/tmp'), null)
   const cfg = normalizePdf({ server: 'http://md2pdf:18509/' }, '/tmp')
   assert.equal(cfg.server, 'http://md2pdf:18509') // trailing slash trimmed
-  assert.deepEqual(cfg.scope, ['page', 'book'])
+  assert.deepEqual(cfg.scope, ['page', 'subpages', 'book'])
   assert.equal(cfg.theme, 'site')
   assert.equal(cfg.numbered, true)
 })
@@ -124,6 +124,84 @@ test('manifest: a book export follows the locale of the page it was asked from',
   assert.deepEqual(Object.keys(m.locales).sort(), ['en', 'lt'])
   assert.equal(langForRoute('/lt/guide/x', ['en', 'lt'], 'en'), 'lt')
   assert.equal(langForRoute('/guide/x', ['en', 'lt'], 'en'), 'en')
+})
+
+test('manifest: every page records its parent in the menu', () => {
+  const pages = flattenSidebar([
+    { text: 'Intro', link: '/' },
+    {
+      text: 'Guide',
+      link: '/guide/',
+      items: [{ text: 'A', link: '/guide/a', items: [{ text: 'A1', link: '/guide/a1' }] }]
+    }
+  ])
+  assert.deepEqual(
+    pages.map((p) => [p.route, p.parent]),
+    [
+      ['/', null],
+      ['/guide/', null],
+      ['/guide/a', '/guide/'],
+      ['/guide/a1', '/guide/a']
+    ]
+  )
+})
+
+test('manifest: a group with no link of its own is not a parent', () => {
+  // The group is a label in the menu, not a page; its children belong to the
+  // page above it, or to the top level when there is none.
+  const pages = flattenSidebar([
+    { text: 'Guide', link: '/guide/', items: [{ text: 'Reference', items: [{ text: 'A', link: '/guide/a' }] }] }
+  ])
+  assert.equal(pages.find((p) => p.route === '/guide/a').parent, '/guide/')
+})
+
+test('manifest: in the folder-tree layout a section owns its own sidebar', () => {
+  // The section's entries are NOT nested under the landing page in the markup —
+  // they are a sidebar keyed BY it. Read naively, every section's children come
+  // out parentless and a subpages export finds nothing.
+  const pages = flattenSidebar({
+    '/': [{ text: 'Guide', link: '/guide/' }],
+    '/guide/': [
+      { text: '\u2190 All sections', link: '/' },
+      { text: 'Guide', link: '/guide/', items: [{ text: 'A', link: '/guide/a' }] }
+    ]
+  })
+  assert.equal(pages.find((p) => p.route === '/guide/a').parent, '/guide/')
+})
+
+test('manifest: routeKey makes the three spellings of a route one', () => {
+  assert.equal(routeKey('/guide/'), '/guide')
+  assert.equal(routeKey('/guide'), '/guide')
+  assert.equal(routeKey('/guide/index.html'), '/guide')
+  assert.equal(routeKey('/'), '')
+})
+
+test('manifest: a subpages export follows the MENU, not the path', () => {
+  // A SUMMARY.md may file a page under a chapter it shares no path with. The
+  // menu is what the reader navigated, so the menu is what the document is.
+  const pages = [
+    { route: '/', title: 'Home', parent: null },
+    { route: '/guide/', title: 'Guide', parent: null },
+    { route: '/guide/a', title: 'A', parent: '/guide/' },
+    { route: '/appendix', title: 'Appendix', parent: '/guide/a' },
+    { route: '/other/', title: 'Other', parent: null }
+  ]
+  assert.deepEqual(subtreePages(pages, '/guide/').map((p) => p.route), ['/guide/', '/guide/a', '/appendix'])
+  // Asked from a leaf: itself and what hangs off it, nothing above.
+  assert.deepEqual(subtreePages(pages, '/guide/a').map((p) => p.route), ['/guide/a', '/appendix'])
+  // Asked from the home page: the whole menu, since every top-level page is
+  // under the site root.
+  assert.deepEqual(subtreePages(pages, '/').map((p) => p.route), pages.map((p) => p.route))
+})
+
+test('manifest: a manifest written before parents falls back to the route', () => {
+  // A dist built by an older version. A coarser document beats an empty one.
+  const pages = [
+    { route: '/guide/', title: 'Guide' },
+    { route: '/guide/a', title: 'A' },
+    { route: '/other/', title: 'Other' }
+  ]
+  assert.deepEqual(subtreePages(pages, '/guide/').map((p) => p.route), ['/guide/', '/guide/a'])
 })
 
 // ---------------------------------------------------------------- document ---
@@ -296,7 +374,7 @@ const ACL = {
   pages: { '/internal/secret': ['editor'] },
   assets: []
 }
-const PDF = { numbered: true, css: '', scope: ['page', 'book'], theme: 'site' }
+const PDF = { numbered: true, css: '', scope: ['page', 'subpages', 'book'], theme: 'site' }
 
 test('export: pageFile resolves cleanUrls routes and refuses traversal', () => {
   const dist = DIST()
@@ -340,6 +418,119 @@ test('export: a book contains what THIS session may read, and lists the rest', (
     session: { sub: 'u', roles: ['editor'] }, mdbookDir: '.'
   })
   assert.doesNotMatch(editor.html, /Omitted pages/)
+})
+
+// A section with children, a grandchild and a gated branch — the shapes a
+// subpages export has to get right.
+const TREE = () =>
+  tmp({
+    'index.html': page('Home', '<h1>Home</h1>'),
+    'guide/index.html': page('Guide', '<h1>Guide</h1><h2>Why</h2>'),
+    'guide/a.html': page('A', '<h1>A</h1>'),
+    'guide/deep/index.html': page('Deep', '<h1>Deep</h1>'),
+    'guide/deep/x.html': page('X', '<h1>X</h1>'),
+    'other/index.html': page('Other', '<h1>Other</h1>'),
+    'assets/style.css': 'body{color:#123456}',
+    'pdf-manifest.json': JSON.stringify({
+      title: 'Site',
+      defaultLang: 'en',
+      locales: {
+        en: {
+          title: 'Site',
+          pages: [
+            { route: '/', title: 'Home', parent: null },
+            { route: '/guide/', title: 'Guide', parent: null },
+            { route: '/guide/a', title: 'A', parent: '/guide/' },
+            { route: '/guide/deep/', title: 'Deep', parent: '/guide/' },
+            { route: '/guide/deep/x', title: 'X', parent: '/guide/deep/' },
+            { route: '/other/', title: 'Other', parent: null }
+          ]
+        }
+      }
+    })
+  })
+
+// Only the deep branch is gated, and by page entries rather than a rule, so the
+// landing page the export is asked FROM stays readable.
+const TREE_ACL = {
+  default: 'public',
+  rules: [],
+  pages: { '/guide/deep/': ['editor'], '/guide/deep/x': ['editor'] },
+  assets: []
+}
+
+test('export: subpages scope is the page and its descendants, and nothing beside', () => {
+  const doc = buildDocument({ dist: TREE(), route: '/guide/', scope: 'subpages', pdf: PDF, mdbookDir: '.' })
+  // Named after the page it was asked from, not after the site.
+  assert.equal(doc.filename, 'Guide.pdf')
+  // Sections are numbered in menu order, the landing page first.
+  assert.match(doc.html, /<h1[^>]*>1\. Guide<\/h1>/)
+  assert.match(doc.html, /<h1[^>]*>2\. A<\/h1>/)
+  assert.match(doc.html, /<h1[^>]*>3\. Deep<\/h1>/)
+  assert.match(doc.html, /<h1[^>]*>4\. X<\/h1>/)
+  // A collection, so it gets the cover and the contents a book gets. Matched on
+  // the ELEMENTS: the class names also occur in the inlined print stylesheet.
+  assert.match(doc.html, /<header class="mdbook-pdf-cover"/)
+  assert.match(doc.html, /<nav class="mdbook-pdf-toc"/)
+  // The siblings above and beside it are not in the document.
+  assert.doesNotMatch(doc.html, /<h1[^>]*>\d+\. Other<\/h1>/)
+  assert.doesNotMatch(doc.html, /<h1[^>]*>\d+\. Home<\/h1>/)
+})
+
+test('export: subpages of a page with none IS a page export — no cover, no contents', () => {
+  const doc = buildDocument({ dist: TREE(), route: '/guide/a', scope: 'subpages', pdf: PDF, mdbookDir: '.' })
+  assert.equal(doc.filename, 'A.pdf')
+  assert.match(doc.html, /<h1[^>]*>A<\/h1>/) // not "1. A" — one page is not section 1
+  assert.doesNotMatch(doc.html, /<header class="mdbook-pdf-cover"/)
+  assert.doesNotMatch(doc.html, /<nav class="mdbook-pdf-toc"/)
+})
+
+test('export: a subpages export carries only the branch THIS session may read', () => {
+  const dist = TREE()
+  const anon = buildDocument({
+    dist, route: '/guide/', scope: 'subpages', pdf: PDF, acl: TREE_ACL, session: null, mdbookDir: '.'
+  })
+  assert.match(anon.html, /<h1[^>]*>1\. Guide<\/h1>/)
+  assert.match(anon.html, /<h1[^>]*>2\. A<\/h1>/)
+  // The gated branch is NAMED, never silently absent.
+  assert.match(anon.html, /Omitted pages/)
+  assert.match(anon.html, /<li>Deep<\/li>/)
+  assert.match(anon.html, /<li>X<\/li>/)
+  assert.doesNotMatch(anon.html, /<h1[^>]*>\d+\. Deep<\/h1>/)
+
+  const editor = buildDocument({
+    dist, route: '/guide/', scope: 'subpages', pdf: PDF, acl: TREE_ACL,
+    session: { sub: 'u', roles: ['editor'] }, mdbookDir: '.'
+  })
+  assert.match(editor.html, /<h1[^>]*>4\. X<\/h1>/)
+  assert.doesNotMatch(editor.html, /Omitted pages/)
+})
+
+test('export: the page a subpages export is asked from is ACL-checked on its own', () => {
+  // Not "a document of the children of a page you cannot open" — the same 403 a
+  // page export gives, which is what serve.mjs turns into a login redirect.
+  assert.throws(
+    () =>
+      buildDocument({
+        dist: TREE(), route: '/guide/deep/', scope: 'subpages', pdf: PDF, acl: TREE_ACL, session: null, mdbookDir: '.'
+      }),
+    (e) => e.status === 403
+  )
+})
+
+test('export: a page outside the menu still exports as itself', () => {
+  const dist = TREE()
+  fs.writeFileSync(path.join(dist, 'loose.html'), page('Loose', '<h1>Loose</h1>'))
+  const doc = buildDocument({ dist, route: '/loose', scope: 'subpages', pdf: PDF, mdbookDir: '.' })
+  assert.equal(doc.filename, 'Loose.pdf')
+  assert.match(doc.html, /<h1[^>]*>Loose<\/h1>/)
+})
+
+test('export: a subpages export of a missing page is a 404, not an empty document', () => {
+  assert.throws(
+    () => buildDocument({ dist: TREE(), route: '/nope', scope: 'subpages', pdf: PDF, mdbookDir: '.' }),
+    (e) => e.status === 404
+  )
 })
 
 test('export: a book built without a manifest says so instead of emitting nothing', () => {
@@ -394,7 +585,7 @@ test('serve: /pdf/status tells the theme whether to show a button at all', async
   )
   assert.deepEqual(JSON.parse((await get(on.port, '/pdf/status')).body.toString()), {
     enabled: true,
-    scope: ['page', 'book']
+    scope: ['page', 'subpages', 'book']
   })
   on.server.close()
   stub.server.close()
@@ -418,6 +609,31 @@ test('serve: a page export reaches md2pdf and comes back as a PDF attachment', a
   assert.equal(res.body.toString(), '%PDF-1.7 stub')
   assert.equal(stub.seen.length, 1)
   assert.match(stub.seen[0].html, /<h1[^>]*>Home<\/h1>/)
+  server.close()
+  stub.server.close()
+})
+
+test('serve: a subpages export is served like any other, as one PDF', async () => {
+  const stub = await stubMd2pdf()
+  const { server, port } = await listen(
+    createHandler({ dist: TREE(), pdf: { ...PDF, server: stub.url, timeout: 5000 }, siteTitle: 'Site', mdbookDir: '.' })
+  )
+  const res = await get(port, '/pdf?path=/guide/&scope=subpages')
+  assert.equal(res.status, 200)
+  assert.match(res.headers['content-disposition'], /filename="Guide\.pdf"/)
+  assert.equal(stub.seen.length, 1)
+  assert.match(stub.seen[0].html, /<h1[^>]*>2\. A<\/h1>/)
+  server.close()
+  stub.server.close()
+})
+
+test('serve: a scope this build does not know falls back to the single page', async () => {
+  const stub = await stubMd2pdf()
+  const { server, port } = await listen(
+    createHandler({ dist: TREE(), pdf: { ...PDF, server: stub.url, timeout: 5000 }, mdbookDir: '.' })
+  )
+  assert.equal((await get(port, '/pdf?path=/guide/&scope=galaxy')).status, 200)
+  assert.doesNotMatch(stub.seen[0].html, /<h1[^>]*>2\. A<\/h1>/)
   server.close()
   stub.server.close()
 })

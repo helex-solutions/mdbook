@@ -582,6 +582,7 @@ a.mdbook-crumb:hover {
   margin-left: 8px;
 }
 .mdbook-pdf-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -598,6 +599,28 @@ a.mdbook-crumb:hover {
 .mdbook-pdf-btn:hover {
   color: var(--vp-c-brand-1);
   border-color: var(--vp-c-brand-1);
+}
+/* The split button: the download the reader almost always wants, plus a caret
+   for the others. One border between the two halves, not two. */
+.mdbook-pdf-group {
+  display: inline-flex;
+  align-items: stretch;
+}
+.mdbook-pdf-btn.is-split {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.mdbook-pdf-caret {
+  padding: 4px 5px;
+  margin-left: -1px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.mdbook-pdf-btn.is-split:hover,
+.mdbook-pdf-caret:hover {
+  /* The hovered half must sit above its neighbour, or the shared edge keeps the
+     neighbour's grey and the highlight looks half-drawn. */
+  z-index: 1;
 }
 .mdbook-pdf-ico {
   display: inline-flex;
@@ -624,6 +647,7 @@ a.mdbook-crumb:hover {
   right: 0;
   z-index: 100;
   min-width: 140px;
+  white-space: nowrap;
   padding: 4px;
   border: 1px solid var(--vp-c-divider);
   border-radius: 8px;
@@ -645,6 +669,11 @@ a.mdbook-crumb:hover {
 .mdbook-pdf-item:hover {
   background: var(--vp-c-bg-soft);
   color: var(--vp-c-brand-1);
+}
+/* The entry the button itself does on a plain click — marked, because a menu
+   that repeats it without saying so reads like a duplicate. */
+.mdbook-pdf-item.is-default {
+  font-weight: 600;
 }
 /* A failed export is SHOWN. Swallowing it is what leaves a reader clicking a
    button that appears to do nothing. */
