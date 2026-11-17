@@ -112,7 +112,7 @@ in [Authentication](#authentication).
        steps:
          - uses: actions/checkout@v7
          - id: mdbook
-           uses: helex-solutions/mdbook@v1.10.0  # pin to a release tag (see Versioning)
+           uses: helex-solutions/mdbook@v1.10.1  # pin to a release tag (see Versioning)
            with: { project: . }
          - uses: actions/configure-pages@v6
          - uses: actions/upload-pages-artifact@v5
@@ -138,7 +138,7 @@ in [Authentication](#authentication).
 
 ### Versioning
 
-Pin the action to a **release tag** (e.g. `helex-solutions/mdbook@v1.10.0`) so your site builds are
+Pin the action to a **release tag** (e.g. `helex-solutions/mdbook@v1.10.1`) so your site builds are
 deterministic — `main` can move without silently redeploying your site. See the
 [releases](https://github.com/helex-solutions/mdbook/releases). Use `@main` only if you want the
 latest, unreleased changes.
@@ -151,6 +151,12 @@ exact version, so `@v1` resolves to nothing — upgrade by changing the pin.
 `v1.8.0` there is nothing to do — `v1.8.1`, `v1.8.2` and `v1.8.3` are patches, and `v1.9.0` adds
 PDF export, which does not exist for a site until `pdf.server` names the md2pdf service. `v1.10.0`
 adds a *Page + subpages* download to that export, which is likewise inert without one.
+
+`v1.10.1` puts a ceiling on how large a multi-page export may be — 200 pages or 32 MB, whichever
+it reaches first — and answers `413` above it rather than assembling a document heavy enough to
+exhaust the serving process. A site whose own book is bigger than that and which was relying on
+the slow path should raise `pdf.maxPages` and `pdf.maxBytes`, or set either to `0`; see
+[How big an export may be](#how-big-an-export-may-be).
 
 `comments.mapping` must read `owliki` if it carried the retired name. Both spellings resolved to
 the same discussion term — the page code — so changing the word keeps every existing thread; a
@@ -170,10 +176,10 @@ nothing at all.
 **To publish a new mdbook version:**
 
 ```bash
-git tag -a v1.10.1 -m "…" && git push origin v1.10.1   # patch; v1.11.0 for features
+git tag -a v1.10.2 -m "…" && git push origin v1.10.2   # patch; v1.11.0 for features
 ```
 
-Then bump `@v1.10.0` → `@v1.10.1` in each consumer's `.github/workflows/mdbook.yml` and push —
+Then bump `@v1.10.1` → `@v1.10.2` in each consumer's `.github/workflows/mdbook.yml` and push —
 a deliberate step, so upgrades are reviewed rather than automatic.
 
 ## Local preview
